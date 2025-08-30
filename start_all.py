@@ -13,6 +13,31 @@ import threading
 import socket
 from pathlib import Path
 
+def can_run_docker_without_sudo():
+    """Verificar si podemos ejecutar Docker sin sudo"""
+    try:
+        result = subprocess.run(['docker', 'ps'], 
+                              capture_output=True, 
+                              text=True, 
+                              timeout=5)
+        return result.returncode == 0
+    except:
+        return False
+
+def run_docker_command(cmd_args, cwd=None, check=True):
+    """Ejecutar comando Docker con sudo si es necesario"""
+    # Verificar si necesitamos sudo
+    need_sudo = not can_run_docker_without_sudo()
+    
+    if need_sudo:
+        print("⚠️ Usando sudo para Docker (reinicia la sesión para evitar esto)")
+        cmd_args = ['sudo'] + cmd_args
+    
+    if check:
+        return subprocess.run(cmd_args, cwd=cwd, check=True)
+    else:
+        return subprocess.run(cmd_args, cwd=cwd, capture_output=True, text=True)
+
 class ImprovedServiceManager:
     def __init__(self):
         self.processes = []
@@ -100,27 +125,37 @@ class ImprovedServiceManager:
             print("❌ Node.js no encontrado")
             return False
         
-        # Verificar pnpm
+        # Verificar pnpm y establecer comando de paquetes
+        self.package_manager = 'npm'
         try:
             result = subprocess.run(['pnpm', '--version'], 
                                   capture_output=True, text=True)
             print(f"✅ pnpm: {result.stdout.strip()}")
+            self.package_manager = 'pnpm'
         except:
             print("⚠️ pnpm no encontrado, usando npm")
+            try:
+                result = subprocess.run(['npm', '--version'], 
+                                      capture_output=True, text=True)
+                print(f"✅ npm: {result.stdout.strip()}")
+            except:
+                print("❌ npm no encontrado")
+                return False
         
         # 2. Verificar y iniciar Docker Compose
         print("\n🐳 VERIFICANDO SERVICIOS DOCKER...")
         
         try:
-            result = subprocess.run(['docker-compose', 'ps'], 
-                                  capture_output=True, text=True, 
-                                  cwd=Path(__file__).parent)
+            result = run_docker_command(['docker', 'compose', 'ps'], 
+                                      cwd=Path(__file__).parent, 
+                                      check=False)
             if 'Up' in result.stdout and 'healthy' in result.stdout:
                 print("✅ PostgreSQL y Redis ya están ejecutándose")
             else:
                 print("🚀 Iniciando PostgreSQL y Redis...")
-                subprocess.run(['docker-compose', 'up', '-d'], 
-                             cwd=Path(__file__).parent, check=True)
+                run_docker_command(['docker', 'compose', 'up', '-d'], 
+                                 cwd=Path(__file__).parent, 
+                                 check=True)
                 time.sleep(10)
                 print("✅ Servicios Docker iniciados")
         except Exception as e:
@@ -149,8 +184,10 @@ class ImprovedServiceManager:
         print("\n🚀 INICIANDO BACKEND EXPRESS...")
         
         if not self.check_port(3001):
+            # Usar el administrador de paquetes correcto
+            backend_cmd = f'{self.package_manager} run server:dev'
             backend_process = self.run_command_async(
-                'pnpm run server:dev',
+                backend_cmd,
                 'Express Backend',
                 cwd=Path(__file__).parent
             )
@@ -168,8 +205,10 @@ class ImprovedServiceManager:
         print("\n⚛️ INICIANDO FRONTEND REACT...")
         
         if not self.check_port(3000):
+            # Usar el administrador de paquetes correcto
+            frontend_cmd = f'{self.package_manager} run dev' if self.package_manager == 'pnpm' else 'npm run client:dev'
             frontend_process = self.run_command_async(
-                'pnpm run dev',
+                frontend_cmd,
                 'React Frontend',
                 cwd=Path(__file__).parent / 'frontend'
             )

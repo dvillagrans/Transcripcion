@@ -50,6 +50,70 @@ class ServiceManager:
             print(f"❌ Error iniciando {name}: {e}")
             return None
     
+    def get_python_command(self):
+        """Obtener el comando Python correcto (virtual env si existe)"""
+        venv_python = Path(__file__).parent / '.venv' / 'bin' / 'python'
+        
+        if venv_python.exists():
+            print("✅ Usando entorno virtual Python")
+            return str(venv_python)
+        else:
+            print("⚠️ Usando Python del sistema")
+            return sys.executable
+    
+    def check_docker_command(self):
+        """Detectar si usar 'docker compose' o 'docker-compose'"""
+        try:
+            # Intentar primero con docker compose (Docker v2)
+            result = subprocess.run(['docker', 'compose', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'docker compose'
+        except:
+            pass
+        
+        try:
+            # Intentar con docker-compose (Docker v1)
+            result = subprocess.run(['docker-compose', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'docker-compose'
+        except:
+            pass
+        
+        return None
+    
+    def check_package_manager(self):
+        """Detectar qué package manager usar (pnpm, yarn, npm)"""
+        # Verificar pnpm
+        try:
+            result = subprocess.run(['pnpm', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'pnpm'
+        except:
+            pass
+        
+        # Verificar yarn
+        try:
+            result = subprocess.run(['yarn', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'yarn'
+        except:
+            pass
+        
+        # Por defecto npm
+        try:
+            result = subprocess.run(['npm', '--version'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'npm'
+        except:
+            pass
+        
+        return None
+    
     def check_python_service(self):
         """Verificar si el servicio Python está funcionando"""
         try:
@@ -106,16 +170,30 @@ class ServiceManager:
         # 2. Verificar y iniciar Docker Compose (base de datos)
         print("\n🐳 Verificando servicios Docker...")
         
+        docker_cmd = self.check_docker_command()
+        if not docker_cmd:
+            print("❌ Docker o Docker Compose no encontrado")
+            print("💡 Instala Docker: https://docs.docker.com/get-docker/")
+            return False
+        
+        print(f"✅ Usando comando: {docker_cmd}")
+        
         # Verificar si Docker Compose ya está ejecutándose
         try:
-            result = subprocess.run(['docker-compose', 'ps'], 
-                                  capture_output=True, text=True, cwd=Path(__file__).parent)
+            if docker_cmd == 'docker compose':
+                result = subprocess.run(['docker', 'compose', 'ps'], 
+                                      capture_output=True, text=True, cwd=Path(__file__).parent)
+            else:
+                result = subprocess.run([docker_cmd, 'ps'], 
+                                      capture_output=True, text=True, cwd=Path(__file__).parent)
+            
             if 'Up' in result.stdout:
                 print("✅ Servicios Docker ya están ejecutándose")
             else:
                 print("🚀 Iniciando servicios Docker...")
+                # Intentar sin sudo primero
                 docker_process = self.run_command(
-                    'docker-compose up -d',
+                    f'{docker_cmd} up -d',
                     'Docker Services',
                     cwd=Path(__file__).parent
                 )
@@ -124,9 +202,9 @@ class ServiceManager:
                     print("✅ Servicios Docker iniciados")
         except Exception as e:
             print(f"⚠️ Error verificando Docker: {e}")
-            print("🚀 Intentando iniciar servicios Docker...")
+            print("🚀 Intentando iniciar servicios Docker con sudo...")
             docker_process = self.run_command(
-                'docker-compose up -d',
+                f'sudo {docker_cmd} up -d',
                 'Docker Services',
                 cwd=Path(__file__).parent
             )
@@ -136,8 +214,11 @@ class ServiceManager:
         
         # 3. Iniciar servicio de transcripción Python
         print("\n🐍 Iniciando servicio de transcripción...")
+        
+        python_cmd = self.get_python_command()
+        
         python_process = self.run_command(
-            f'{sys.executable} transcription_service.py',
+            f'{python_cmd} transcription_service.py',
             'Transcription Service',
             cwd=Path(__file__).parent
         )
@@ -151,8 +232,25 @@ class ServiceManager:
         
         # 4. Iniciar backend Express
         print("\n🚀 Iniciando backend Express...")
+        
+        # Detectar package manager
+        pkg_manager = self.check_package_manager()
+        if not pkg_manager:
+            print("❌ No se encontró npm, yarn o pnpm")
+            return False
+        
+        print(f"✅ Usando package manager: {pkg_manager}")
+        
+        # Comando según el package manager
+        if pkg_manager == 'pnpm':
+            run_cmd = 'pnpm run server:dev'
+        elif pkg_manager == 'yarn':
+            run_cmd = 'yarn server:dev'
+        else:  # npm
+            run_cmd = 'npm run server:dev'
+        
         backend_process = self.run_command(
-            'pnpm run server:dev',
+            run_cmd,
             'Express Backend',
             cwd=Path(__file__).parent
         )
@@ -166,8 +264,17 @@ class ServiceManager:
         
         # 5. Iniciar frontend React
         print("\n⚛️ Iniciando frontend React...")
+        
+        # Comando para frontend según el package manager
+        if pkg_manager == 'pnpm':
+            frontend_cmd = 'pnpm run dev'
+        elif pkg_manager == 'yarn':
+            frontend_cmd = 'yarn dev'
+        else:  # npm
+            frontend_cmd = 'npm run dev'
+        
         frontend_process = self.run_command(
-            'pnpm run dev',
+            frontend_cmd,
             'React Frontend',
             cwd=Path(__file__).parent / 'frontend'
         )
@@ -188,7 +295,12 @@ class ServiceManager:
         print("\n💡 Comandos útiles:")
         print("   - Probar transcripción: curl http://localhost:5000/health")
         print("   - Ver trabajos: curl http://localhost:3001/api/audio/jobs")
+        print(f"   - Parar Docker: sudo {docker_cmd} down")
         print("   - Parar servicios: Ctrl+C")
+        
+        print("\n📦 Dependencias detectadas:")
+        print(f"   - Docker: {docker_cmd}")
+        print(f"   - Package Manager: {pkg_manager}")
         
         return True
     

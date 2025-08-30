@@ -58,7 +58,7 @@ export class AudioProcessingService {
       });
       return response.status === 200;
     } catch (error) {
-      console.warn('Transcription service health check failed:', error.message);
+      console.warn('Transcription service health check failed:', (error as Error).message);
       return false;
     }
   }
@@ -75,22 +75,57 @@ export class AudioProcessingService {
         file_path: path.resolve(filePath),
         model: options.whisperModel || 'medium',
         language: null, // Auto-detect
-        generate_summary: options.generateSummary || false
+        generate_summary: options.generateSummary || false,
+        job_id: jobId // ¡IMPORTANTE! Pasar job_id para tracking de progreso
       };
       
       this.setProgress(jobId, 30, 'Enviando archivo para transcripción');
       
-      // Call transcription service
-      const response = await axios.post(
-        `${this.TRANSCRIPTION_SERVICE_URL}/transcribe`,
-        transcriptionRequest,
-        {
-          timeout: 300000, // 5 minutes timeout
-          headers: {
-            'Content-Type': 'application/json'
-          }
+      // Para archivos largos, usar timeout extendido dinámicamente
+      let response;
+      try {
+        const fs = await import('fs/promises');
+        const fileStats = await fs.stat(filePath);
+        const fileSizeMB = fileStats.size / (1024 * 1024);
+        
+        // Calcular timeout basado en tamaño del archivo
+        // Aproximadamente 1 minuto de processing por cada 10 minutos de audio
+        let timeoutMs = 600000; // 10 minutos por defecto
+        
+        if (fileSizeMB > 50) { // Archivos grandes (>50MB probablemente >30min)
+          timeoutMs = 1800000; // 30 minutos
         }
-      );
+        if (fileSizeMB > 200) { // Archivos muy grandes (>200MB probablemente >1h)
+          timeoutMs = 3600000; // 60 minutos
+        }
+        
+        console.log(`🕒 Timeout configurado para ${timeoutMs/1000/60} minutos para archivo de ${fileSizeMB.toFixed(1)}MB`);
+        
+        // Call transcription service
+        response = await axios.post(
+          `${this.TRANSCRIPTION_SERVICE_URL}/transcribe`,
+          transcriptionRequest,
+          {
+            timeout: timeoutMs,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      } catch (fsError) {
+        console.log('⚠️ No se pudo determinar el tamaño del archivo, usando timeout estándar');
+        // Fallback con timeout más largo por defecto
+        response = await axios.post(
+          `${this.TRANSCRIPTION_SERVICE_URL}/transcribe`,
+          transcriptionRequest,
+          {
+            timeout: 1800000, // 30 minutos por defecto
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
       
       const result = response.data;
       
