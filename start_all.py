@@ -57,10 +57,29 @@ class ImprovedServiceManager:
         """Esperar a que un puerto esté disponible"""
         print(f"⏳ Esperando a que {name} esté disponible en puerto {port}...")
         
+        # Intervalos para mostrar progreso
+        progress_intervals = [15, 30, 60, 90, 120]
+        last_message = 0
+        
         for i in range(timeout):
             if self.check_port(port):
                 print(f"✅ {name} está funcionando en puerto {port}")
                 return True
+            
+            # Mostrar mensajes de progreso para servicios que tardan
+            if port == 5000 and i in progress_intervals and i > last_message:
+                if i == 15:
+                    print("🔄 Descargando/cargando modelo large-v3... (esto puede tomar tiempo)")
+                elif i == 30:
+                    print("⏳ Modelo large-v3 cargando en memoria...")
+                elif i == 60:
+                    print("🧠 Inicializando modelo con optimizaciones para 32GB RAM...")
+                elif i == 90:
+                    print("🔧 Finalizando configuración del modelo...")
+                elif i == 120:
+                    print("⏰ Casi listo... El modelo es grande pero vale la pena!")
+                last_message = i
+                
             time.sleep(1)
             
         print(f"❌ {name} no respondió en puerto {port} después de {timeout} segundos")
@@ -164,6 +183,7 @@ class ImprovedServiceManager:
         
         # 3. Iniciar servicio de transcripción Python
         print("\n🐍 INICIANDO SERVICIO DE TRANSCRIPCIÓN...")
+        print("⏳ Nota: La primera carga del modelo large-v3 puede tomar 2-3 minutos...")
         
         if not self.check_port(5000):
             python_process = self.run_command_async(
@@ -173,10 +193,11 @@ class ImprovedServiceManager:
             )
             
             if python_process:
-                if self.wait_for_port(5000, 'Servicio de Transcripción', 60):
+                if self.wait_for_port(5000, 'Servicio de Transcripción', 180):  # 3 minutos para large-v3
                     print("✅ Servicio de transcripción funcionando")
                 else:
                     print("⚠️ Servicio de transcripción no responde, continuando...")
+                    print("💡 El modelo large-v3 está cargando en segundo plano...")
         else:
             print("✅ Servicio de transcripción ya está ejecutándose")
         

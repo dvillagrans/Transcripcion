@@ -69,18 +69,12 @@ def get_device_config():
                 'num_workers': 1
             }
         
-        # En modo robusto, usar CPU directamente si hay problemas conocidos
+        # ROBUST_MODE ya no fuerza CPU - permite GPU con configuración estable
         robust_mode = os.getenv('ROBUST_MODE', 'false').lower() == 'true'
         if robust_mode:
-            logger.info("🛡️ ROBUST_MODE activado: usando CPU para máxima estabilidad")
-            return {
-                'device': 'cpu',
-                'compute_type': 'float32',
-                'cpu_threads': min(8, os.cpu_count() or 4),
-                'num_workers': 1
-            }
+            logger.info("🛡️ ROBUST_MODE activado: usando configuración estable")
         
-        # Probar cuDNN solo si no estamos en modo robusto
+        # Probar GPU - aún en modo robusto podemos usar GPU
         try:
             # Test básico de cuDNN con timeout
             import signal
@@ -140,12 +134,21 @@ if os.getenv('FORCE_CPU', '').lower() in ['true', '1', 'yes']:
 # Modo robusto para archivos largos (usa configuración más conservadora)
 ROBUST_MODE = os.getenv('ROBUST_MODE', 'true').lower() in ['true', '1', 'yes']
 
+# Modelo por defecto - puede ser configurado por variable de entorno
+DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'large-v3')
+DEV_MODE = os.getenv('DEV_MODE', 'false').lower() in ['true', '1', 'yes']
+
+# Si está en modo desarrollo, usar modelo más rápido
+if DEV_MODE:
+    DEFAULT_MODEL = 'medium'
+    logger.info("🚧 Modo desarrollo: usando modelo 'medium' para carga rápida")
+
 CONFIG = {
     'models_dir': './models',
     'uploads_dir': './uploads',
     'supported_formats': ['.mp3', '.wav', '.flac', '.m4a', '.ogg'],
     'max_file_size': 500 * 1024 * 1024,  # 500MB para archivos largos
-    'default_model': 'large-v3',  # Optimizado para 32GB RAM
+    'default_model': DEFAULT_MODEL,
     'default_language': 'es',  # Español por defecto
     'device': device,
     'compute_type': compute_type,
@@ -155,7 +158,6 @@ CONFIG = {
     'segment_length': 600,  # 10 minutos por segmento (era 300)
     'parallel_workers': 3,  # Procesar 3 segmentos simultáneamente
     'preload_model': True,  # Mantener modelo en memoria
-    'batch_size': 16,  # Batch más grande para better throughput
 }
 
 # Logger configuration
@@ -188,6 +190,21 @@ class TranscriptionService:
         try:
             default_model = CONFIG['default_model']
             logger.info(f"🚀 Precargando modelo {default_model} en memoria...")
+            
+            # Mostrar información sobre el modelo
+            model_sizes = {
+                'tiny': '39MB',
+                'base': '74MB', 
+                'small': '244MB',
+                'medium': '769MB',
+                'large-v3': '1550MB'
+            }
+            
+            model_size = model_sizes.get(default_model, 'Desconocido')
+            logger.info(f"📦 Modelo {default_model}: ~{model_size}")
+            
+            if default_model == 'large-v3':
+                logger.info("⏳ Este es un modelo grande, puede tomar 1-3 minutos la primera vez...")
             
             model = WhisperModel(
                 default_model,
@@ -390,8 +407,7 @@ class TranscriptionService:
                     log_prob_threshold=-1.0,
                     no_speech_threshold=0.6,
                     condition_on_previous_text=False,
-                    initial_prompt=None,
-                    batch_size=CONFIG.get('batch_size', 16)
+                    initial_prompt=None
                 )
                 
                 # Procesar transcripción
