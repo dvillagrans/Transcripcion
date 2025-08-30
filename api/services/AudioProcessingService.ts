@@ -142,6 +142,15 @@ export class AudioProcessingService {
       if (result.success) {
         this.setProgress(jobId, 70, 'Procesando resultados de transcripción');
         
+        console.log(`✅ Transcription response received for job ${jobId}:`, {
+          hasTranscription: !!result.transcription,
+          transcriptionLength: result.transcription?.length || 0,
+          hasSummary: !!result.summary,
+          summaryLength: result.summary?.length || 0,
+          duration: result.duration,
+          processingTime: result.processing_time
+        });
+        
         // Update job with transcription results
         const updateData: any = {
           transcription: result.transcription
@@ -154,7 +163,18 @@ export class AudioProcessingService {
           console.log(`No summary received from Python service for job ${jobId}`);
         }
         
-        await JobService.updateJob(jobId, updateData);
+        console.log(`🔄 Updating database for job ${jobId} with:`, {
+          transcriptionLength: updateData.transcription?.length || 0,
+          summaryLength: updateData.summary?.length || 0
+        });
+        
+        const updateResult = await JobService.updateJob(jobId, updateData);
+        
+        if (updateResult) {
+          console.log(`✅ Job ${jobId} updated successfully in database`);
+        } else {
+          console.error(`❌ Failed to update job ${jobId} in database`);
+        }
         
         console.log(`Transcription completed for job ${jobId}:`, {
           duration: result.duration,
@@ -169,7 +189,13 @@ export class AudioProcessingService {
       }
       
     } catch (error) {
-      console.error('Error in faster-whisper transcription:', error);
+      console.error('❌ Error in faster-whisper transcription:', error);
+      console.error('❌ Error details:', {
+        jobId,
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+        response: (error as any).response?.data
+      });
       
       // Fallback to simulation if real transcription fails
       console.log('Falling back to simulation...');
