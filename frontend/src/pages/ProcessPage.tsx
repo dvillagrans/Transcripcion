@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import SegmentProgressDisplay from '@/components/SegmentProgressDisplay';
 
 interface ProcessingJob {
   jobId: string;
@@ -13,6 +14,14 @@ interface ProcessingJob {
   status: 'processing' | 'completed' | 'error';
   progress: number;
   currentStage: string;
+  // Agregar campos adicionales para progreso detallado
+  estimated_time_remaining?: number;
+  current_segment?: number;
+  total_segments?: number;
+  processed_duration?: number;
+  total_duration?: number;
+  use_segmentation?: boolean;
+  start_time?: number;
 }
 
 const ProcessPage: React.FC = () => {
@@ -93,6 +102,24 @@ const ProcessPage: React.FC = () => {
   const startPolling = (jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
+        // Obtener progreso detallado desde el servicio de transcripción
+        const transcriptionResponse = await fetch(`http://localhost:5000/progress/${jobId}`);
+        const transcriptionResult = await transcriptionResponse.json();
+        
+        let detailedProgress = {};
+        if (transcriptionResult.success) {
+          detailedProgress = {
+            estimated_time_remaining: transcriptionResult.progress.estimated_time_remaining,
+            current_segment: transcriptionResult.progress.current_segment,
+            total_segments: transcriptionResult.progress.total_segments,
+            processed_duration: transcriptionResult.progress.processed_duration,
+            total_duration: transcriptionResult.progress.total_duration,
+            use_segmentation: transcriptionResult.progress.total_segments > 1,
+            start_time: transcriptionResult.progress.start_time
+          };
+        }
+
+        // Obtener estado del backend Express
         const response = await fetch(`/api/audio/status/${jobId}`);
         const result = await response.json();
 
@@ -102,7 +129,8 @@ const ProcessPage: React.FC = () => {
             filename: currentJob?.filename || '',
             status: result.data.status,
             progress: result.data.progress,
-            currentStage: result.data.currentStage
+            currentStage: result.data.currentStage,
+            ...detailedProgress
           };
           setCurrentJob(updatedJob);
 
@@ -293,128 +321,49 @@ const ProcessPage: React.FC = () => {
 
         {/* Processing Status */}
         {currentJob && (
-          <div className="glass-effect rounded-3xl p-8 animate-slide-up">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Procesando tu Audio</h2>
-              <p className="text-gray-600">Transformando audio en texto con IA avanzada</p>
-            </div>
+          <div className="animate-slide-up">
+            <SegmentProgressDisplay 
+              progressData={{
+                jobId: currentJob.jobId,
+                status: currentJob.status === 'processing' ? 'transcribiendo' : 
+                        currentJob.status === 'completed' ? 'completado' : 'error',
+                progress: currentJob.progress,
+                stage: currentJob.currentStage,
+                start_time: currentJob.start_time || Date.now() / 1000,
+                estimated_time_remaining: currentJob.estimated_time_remaining,
+                current_segment: currentJob.current_segment || 0,
+                total_segments: currentJob.total_segments || 0,
+                processed_duration: currentJob.processed_duration || 0,
+                total_duration: currentJob.total_duration || 0,
+                use_segmentation: currentJob.use_segmentation || false
+              }}
+              filename={currentJob.filename}
+            />
             
-            <div className="space-y-8">
-              {/* File Info */}
-              <div className="flex items-center justify-center space-x-4 p-6 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl border border-primary-200">
-                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                  <FileAudio className="h-8 w-8 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-gray-800 text-lg">{currentJob.filename}</p>
-                  <p className="text-sm text-gray-600 font-mono bg-white px-3 py-1 rounded-full mt-1">
-                    ID: {currentJob.jobId.slice(0, 8)}...
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress Section */}
-              <div className="space-y-6">
-                {/* Current Stage */}
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-gray-700 mb-2">{currentJob.currentStage}</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                    {currentJob.progress}%
-                  </p>
-                </div>
-                
-                {/* Progress Bar */}
-                <div className="relative">
-                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-                    <div
-                      className="h-4 rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-primary-500 to-secondary-500 relative overflow-hidden"
-                      style={{ width: `${currentJob.progress}%` }}
-                    >
-                      {/* Animated shine effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shine"></div>
-                    </div>
-                  </div>
-                  
-                  {/* Progress indicators */}
-                  <div className="flex justify-between mt-2 text-xs text-gray-500">
-                    <span>0%</span>
-                    <span>25%</span>
-                    <span>50%</span>
-                    <span>75%</span>
-                    <span>100%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div className="flex justify-center">
-                {currentJob.status === 'processing' && (
-                  <div className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-primary-100 to-secondary-100 rounded-2xl border border-primary-200">
-                    <Loader2 className="h-6 w-6 text-primary-600 animate-spin" />
-                    <span className="text-primary-700 font-semibold text-lg">Procesando...</span>
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    </div>
-                  </div>
-                )}
-                {currentJob.status === 'completed' && (
-                  <div className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-success-100 to-primary-100 rounded-2xl border border-success-200 animate-pulse">
-                    <CheckCircle className="h-6 w-6 text-success-600" />
-                    <span className="text-success-700 font-semibold text-lg">¡Completado!</span>
-                    <div className="w-2 h-2 bg-success-500 rounded-full animate-ping"></div>
-                  </div>
-                )}
-                {currentJob.status === 'error' && (
-                  <div className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-danger-100 to-warning-100 rounded-2xl border border-danger-200">
-                    <AlertCircle className="h-6 w-6 text-danger-600" />
-                    <span className="text-danger-700 font-semibold text-lg">Error en el procesamiento</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
+            {/* Actions */}
+            <div className="mt-6 flex justify-center space-x-4">
               {currentJob.status === 'completed' && (
-                <div className="flex justify-center pt-6">
-                  <button
-                    onClick={() => navigate(`/results/${currentJob.jobId}`)}
-                    className="group relative px-8 py-4 bg-gradient-to-r from-success-500 to-primary-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 overflow-hidden"
-                  >
-                    {/* Animated background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-success-600 to-primary-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    
-                    {/* Button content */}
-                    <div className="relative flex items-center space-x-3">
-                      <CheckCircle className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
-                      <span>Ver Resultados</span>
-                    </div>
-                    
-                    {/* Shine effect */}
-                    <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shine"></div>
-                  </button>
-                </div>
+                <button
+                  onClick={() => navigate(`/results/${currentJob.jobId}`)}
+                  className="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 overflow-hidden"
+                >
+                  <div className="relative flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
+                    <span>Ver Resultados</span>
+                  </div>
+                </button>
               )}
 
               {currentJob.status === 'error' && (
-                <div className="flex justify-center pt-6">
-                  <button
-                    onClick={resetForm}
-                    className="group relative px-8 py-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 overflow-hidden"
-                  >
-                    {/* Animated background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-gray-600 to-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    
-                    {/* Button content */}
-                    <div className="relative flex items-center space-x-3">
-                      <AlertCircle className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
-                      <span>Intentar de Nuevo</span>
-                    </div>
-                    
-                    {/* Shine effect */}
-                    <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shine"></div>
-                  </button>
-                </div>
+                <button
+                  onClick={resetForm}
+                  className="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  <div className="relative flex items-center space-x-3">
+                    <AlertCircle className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
+                    <span>Intentar de Nuevo</span>
+                  </div>
+                </button>
               )}
             </div>
           </div>

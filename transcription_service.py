@@ -21,6 +21,7 @@ import filetype
 import librosa
 import soundfile as sf
 import torch
+import numpy as np
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
@@ -254,6 +255,151 @@ class TranscriptionService:
             logger.error(f"Error preprocesando audio: {e}")
             return file_path  # Devolver original si falla
     
+    def segment_audio(self, file_path: str, segment_duration: int = 300) -> list:
+        """Dividir audio en segmentos de duración específica (defecto: 5 minutos)"""
+        try:
+            # Cargar audio para obtener información
+            audio, sr = librosa.load(file_path, sr=None)
+            total_duration = len(audio) / sr
+            
+            # Calcular número de segmentos
+            num_segments = int(np.ceil(total_duration / segment_duration))
+            segment_paths = []
+            
+            logger.info(f"🧩 Dividiendo audio de {total_duration:.1f}s en {num_segments} segmentos de {segment_duration}s")
+            
+            segments_dir = os.path.join(os.path.dirname(file_path), '..', 'segments')
+            os.makedirs(segments_dir, exist_ok=True)
+            
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            
+            for i in range(num_segments):
+                start_time = i * segment_duration
+                end_time = min((i + 1) * segment_duration, total_duration)
+                
+                # Calcular índices de muestras
+                start_sample = int(start_time * sr)
+                end_sample = int(end_time * sr)
+                
+                # Extraer segmento
+                segment_audio = audio[start_sample:end_sample]
+                
+                # Guardar segmento
+                segment_filename = f"{base_name}_segment_{i+1:03d}.wav"
+                segment_path = os.path.join(segments_dir, segment_filename)
+                
+                sf.write(segment_path, segment_audio, sr)
+                segment_paths.append(segment_path)
+                
+                logger.info(f"Segmento {i+1}/{num_segments} guardado: {segment_filename} ({end_time-start_time:.1f}s)")
+            
+            return segment_paths
+            
+        except Exception as e:
+            logger.error(f"Error segmentando audio: {e}")
+            return [file_path]  # Retornar archivo original si falla
+    
+    def transcribe_segments(self, segment_paths: list, job_id: str, model, language: str = None) -> list:
+        """Transcribir cada segmento por separado"""
+        transcriptions = []
+        total_segments = len(segment_paths)
+        
+        for i, segment_path in enumerate(segment_paths):
+            try:
+                segment_num = i + 1
+                logger.info(f"Transcribiendo segmento {segment_num}/{total_segments}: {os.path.basename(segment_path)}")
+                
+                # Actualizar progreso
+                progress = 25 + int((i / total_segments) * 65)  # 25% a 90%
+                transcription_progress[job_id].update({
+                    'stage': f'Transcribiendo segmento {segment_num}/{total_segments}...',
+                    'progress': progress,
+                    'current_segment': segment_num,
+                    'total_segments': total_segments
+                })
+                
+                # Transcribir segmento
+                segments, info = model.transcribe(
+                    segment_path,
+                    language=language,
+                    beam_size=1 if CONFIG['robust_mode'] else 5,
+                    patience=1.0,
+                    word_timestamps=True,
+                    initial_prompt=None
+                )
+                
+                # Recopilar texto del segmento
+                segment_text = ""
+                for segment in segments:
+                    segment_text += segment.text + " "
+                
+                segment_text = segment_text.strip()
+                transcriptions.append({
+                    'segment_number': segment_num,
+                    'text': segment_text,
+                    'file_path': segment_path,
+                    'language': info.language,
+                    'duration': info.duration
+                })
+                
+                # Guardar transcripción del segmento
+                segments_dir = os.path.dirname(segment_path)
+                base_name = os.path.splitext(os.path.basename(segment_path))[0]
+                transcription_file = os.path.join(segments_dir, f"transcription_{base_name}.txt")
+                
+                with open(transcription_file, 'w', encoding='utf-8') as f:
+                    f.write(f"# Segmento {segment_num}/{total_segments}\n")
+                    f.write(f"# Archivo: {os.path.basename(segment_path)}\n")
+                    f.write(f"# Idioma: {info.language}\n")
+                    f.write(f"# Duración: {info.duration:.1f}s\n\n")
+                    f.write(segment_text)
+                
+                logger.info(f"✅ Segmento {segment_num} completado: {len(segment_text)} caracteres")
+                
+            except Exception as e:
+                logger.error(f"❌ Error transcribiendo segmento {segment_num}: {e}")
+                # Continuar con el siguiente segmento
+                transcriptions.append({
+                    'segment_number': segment_num,
+                    'text': f"[ERROR: No se pudo transcribir el segmento {segment_num}]",
+                    'file_path': segment_path,
+                    'error': str(e)
+                })
+        
+        return transcriptions
+    
+    def cleanup_segments(self, segment_paths: list):
+        """Limpiar archivos de segmentos temporales"""
+        try:
+            segments_dir = os.path.dirname(segment_paths[0]) if segment_paths else None
+            if not segments_dir:
+                return
+            
+            # Eliminar archivos de segmentos
+            for segment_path in segment_paths:
+                try:
+                    if os.path.exists(segment_path):
+                        os.remove(segment_path)
+                        logger.info(f"🗑️ Eliminado segmento: {os.path.basename(segment_path)}")
+                except Exception as e:
+                    logger.warning(f"No se pudo eliminar {segment_path}: {e}")
+            
+            # Eliminar archivos de transcripción de segmentos (mantener solo la final)
+            for segment_path in segment_paths:
+                base_name = os.path.splitext(os.path.basename(segment_path))[0]
+                transcription_file = os.path.join(segments_dir, f"transcription_{base_name}.txt")
+                try:
+                    if os.path.exists(transcription_file):
+                        os.remove(transcription_file)
+                        logger.info(f"🗑️ Eliminada transcripción temporal: transcription_{base_name}.txt")
+                except Exception as e:
+                    logger.warning(f"No se pudo eliminar {transcription_file}: {e}")
+            
+            logger.info("🧹 Limpieza de segmentos completada")
+            
+        except Exception as e:
+            logger.error(f"Error limpiando segmentos: {e}")
+    
     def transcribe_audio(self, file_path: str, job_id: str = None, model_name: str = None, 
                         language: str = None, generate_summary: bool = False) -> Dict[str, Any]:
         """Transcribir archivo de audio con seguimiento de progreso"""
@@ -303,150 +449,212 @@ class TranscriptionService:
             # Obtener modelo
             model = self.get_model(model_name)
             
-            # Limpiar memoria GPU antes de transcripción larga
-            if CONFIG['device'] == 'cuda':
-                try:
-                    import torch
-                    torch.cuda.empty_cache()
-                    logger.info("Memoria GPU limpiada antes de transcripción")
-                except:
-                    pass
+            # Decidir si usar segmentación basado en duración
+            use_segmentation = audio_info['duration'] > 600  # Más de 10 minutos
+            segment_paths = []
             
-            transcription_progress[job_id].update({
-                'stage': 'Iniciando transcripción...',
-                'progress': 25,
-                'status': 'transcribiendo'
-            })
-            
-            # Intentar transcripción con manejo de errores robusto
-            max_retries = 2 if CONFIG['robust_mode'] else 1
-            last_error = None
-            
-            for attempt in range(max_retries):
-                try:
-                    if attempt > 0:
-                        logger.info(f"Reintentando transcripción (intento {attempt + 1}/{max_retries})")
-                        transcription_progress[job_id].update({
-                            'stage': f'Reintentando transcripción (intento {attempt + 1})...',
-                        })
-                        
-                        # En reintento, forzar CPU si el primer intento falló con GPU
-                        if CONFIG['device'] == 'cuda' and attempt == 1:
-                            logger.info("🔄 Cambiando a CPU para mayor estabilidad en archivo largo")
-                            model = self.get_model(model_name)  # Recargar modelo, puede usar CPU fallback
-                    
-                    # Configurar parámetros según el dispositivo y modo robusto
-                    if CONFIG['device'] == 'cuda' and not CONFIG['robust_mode']:
-                        # Configuración optimizada para GPU
-                        beam_size, best_of = 3, 3
-                        vad_params = dict(
-                            min_silence_duration_ms=1000,
-                            threshold=0.5,
-                            min_speech_duration_ms=250,
-                            max_speech_duration_s=float('inf')
-                        )
-                    else:
-                        # Configuración conservadora para CPU o modo robusto
-                        beam_size, best_of = 1, 1
-                        vad_params = dict(
-                            min_silence_duration_ms=500,
-                            threshold=0.5,
-                            min_speech_duration_ms=250
-                        )
-                    
-                    # Transcribir con configuración adaptativa
-                    segments, info = model.transcribe(
-                        processed_path,
-                        language=language,
-                        beam_size=beam_size,
-                        best_of=best_of,
-                        temperature=0.0,
-                        condition_on_previous_text=False,
-                        vad_filter=True,
-                        vad_parameters=vad_params,
-                        word_timestamps=True,
-                        compression_ratio_threshold=2.4,
-                        log_prob_threshold=-1.0,
-                        no_speech_threshold=0.6
-                    )
-                    
-                    # Si llegamos aquí, la transcripción fue exitosa
-                    break
-                    
-                except Exception as e:
-                    last_error = e
-                    error_msg = str(e)
-                    logger.warning(f"Error en intento {attempt + 1}: {error_msg}")
-                    
-                    # Si es un error de CUDA/cuDNN y tenemos más intentos
-                    if attempt < max_retries - 1 and ('cudnn' in error_msg.lower() or 'cuda' in error_msg.lower()):
-                        logger.info("🔄 Error relacionado con CUDA, reintentando con CPU...")
-                        CONFIG['device'] = 'cpu'
-                        CONFIG['compute_type'] = 'int8'
-                        continue
-                    else:
-                        # Si no hay más intentos o no es error de CUDA, lanzar error
-                        raise last_error
-            
-            transcription_progress[job_id].update({
-                'stage': 'Procesando segmentos...',
-                'progress': 30
-            })
-            
-            # Procesar segmentos con progreso
-            transcription_segments = []
-            full_text = ""
-            segments_list = list(segments)  # Convertir a lista para contar
-            total_segments = len(segments_list)
-            
-            transcription_progress[job_id].update({
-                'total_segments': total_segments
-            })
-            
-            for i, segment in enumerate(segments_list):
-                segment_data = {
-                    'start': segment.start,
-                    'end': segment.end,
-                    'text': segment.text.strip(),
-                    'confidence': getattr(segment, 'avg_logprob', 0.0)
-                }
-                transcription_segments.append(segment_data)
-                full_text += segment.text.strip() + " "
-                
-                # Actualizar progreso (30% a 90% durante procesamiento de segmentos)
-                segment_progress = 30 + (60 * (i + 1) / total_segments)
-                processed_time = segment.end
-                
-                # Calcular tiempo estimado restante
-                elapsed_time = time.time() - start_time
-                if processed_time > 0:
-                    estimated_total_time = elapsed_time * (audio_info['duration'] / processed_time)
-                    estimated_remaining = max(0, estimated_total_time - elapsed_time)
-                else:
-                    estimated_remaining = None
-                
+            if use_segmentation:
+                logger.info(f"🧩 Audio largo detectado ({audio_info['duration']:.1f}s), usando segmentación")
                 transcription_progress[job_id].update({
-                    'progress': int(segment_progress),
-                    'current_segment': i + 1,
-                    'processed_duration': processed_time,
-                    'estimated_time_remaining': estimated_remaining,
-                    'stage': f'Procesando segmento {i + 1}/{total_segments} ({processed_time:.1f}s/{audio_info["duration"]:.1f}s)'
+                    'stage': 'Segmentando audio en bloques de 5 minutos...',
+                    'progress': 22
                 })
                 
-                # Log progreso más frecuente para archivos largos
-                log_interval = min(10, max(1, total_segments // 20))  # Log cada 5% aprox
-                if (i + 1) % log_interval == 0 or i == total_segments - 1:
-                    remaining_str = f", quedan ~{estimated_remaining/60:.1f} min" if estimated_remaining else ""
-                    logger.info(f"Progreso: {i + 1}/{total_segments} segmentos ({segment_progress:.1f}%{remaining_str})")
+                # Segmentar audio
+                segment_paths = self.segment_audio(processed_path, segment_duration=300)  # 5 minutos
+                
+                transcription_progress[job_id].update({
+                    'total_segments': len(segment_paths),
+                    'stage': f'Audio segmentado en {len(segment_paths)} bloques',
+                    'progress': 25,
+                    'status': 'transcribiendo'
+                })
+                
+                # Transcribir segmentos
+                transcriptions_data = self.transcribe_segments(segment_paths, job_id, model, language)
+                
+                # Combinar transcripciones
+                transcription_progress[job_id].update({
+                    'stage': 'Combinando transcripciones...',
+                    'progress': 90
+                })
+                
+                full_text = ""
+                segments_info = []
+                total_duration = 0
+                
+                for trans_data in transcriptions_data:
+                    if 'error' not in trans_data:
+                        full_text += trans_data['text'] + "\n\n"
+                        segments_info.append({
+                            'segment': trans_data['segment_number'],
+                            'text': trans_data['text'],
+                            'language': trans_data.get('language', 'unknown'),
+                            'duration': trans_data.get('duration', 0)
+                        })
+                        total_duration += trans_data.get('duration', 0)
+                    else:
+                        full_text += trans_data['text'] + "\n\n"
+                
+                # Limpiar archivos temporales
+                self.cleanup_segments(segment_paths)
+                
+                # Crear resultado final
+                info = type('obj', (object,), {
+                    'language': segments_info[0]['language'] if segments_info else 'unknown',
+                    'language_probability': 0.9,
+                    'duration': total_duration,
+                    'segments_count': len(segments_info)
+                })()
+                
+                full_text = full_text.strip()
+                
+                # Crear transcription_segments para compatibilidad
+                transcription_segments = []
+                for i, trans_data in enumerate(transcriptions_data):
+                    if 'error' not in trans_data:
+                        transcription_segments.append({
+                            'start': i * 300,  # 5 minutos por segmento
+                            'end': min((i + 1) * 300, audio_info['duration']),
+                            'text': trans_data['text'],
+                            'confidence': 0.0
+                        })
+                
+            else:
+                # Transcripción normal para audios cortos
+                logger.info(f"📝 Audio corto ({audio_info['duration']:.1f}s), transcripción directa")
+                
+                # Limpiar memoria GPU antes de transcripción larga
+                if CONFIG['device'] == 'cuda':
+                    try:
+                        import torch
+                        torch.cuda.empty_cache()
+                        logger.info("Memoria GPU limpiada antes de transcripción")
+                    except:
+                        pass
+                
+                transcription_progress[job_id].update({
+                    'stage': 'Iniciando transcripción...',
+                    'progress': 25,
+                    'status': 'transcribiendo'
+                })
+                
+                # Intentar transcripción con manejo de errores robusto
+                max_retries = 2 if CONFIG['robust_mode'] else 1
+                last_error = None
+                
+                for attempt in range(max_retries):
+                    try:
+                        if attempt > 0:
+                            logger.info(f"Reintentando transcripción (intento {attempt + 1}/{max_retries})")
+                            transcription_progress[job_id].update({
+                                'stage': f'Reintentando transcripción (intento {attempt + 1})...',
+                            })
+                            
+                            # En reintento, forzar CPU si el primer intento falló con GPU
+                            if CONFIG['device'] == 'cuda' and attempt == 1:
+                                logger.info("🔄 Cambiando a CPU para mayor estabilidad en archivo largo")
+                                model = self.get_model(model_name)  # Recargar modelo, puede usar CPU fallback
+                        
+                        # Configurar parámetros según el dispositivo y modo robusto
+                        if CONFIG['device'] == 'cuda' and not CONFIG['robust_mode']:
+                            # Configuración optimizada para GPU
+                            beam_size, best_of = 3, 3
+                            vad_params = dict(
+                                min_silence_duration_ms=1000,
+                                threshold=0.5,
+                                min_speech_duration_ms=250,
+                                max_speech_duration_s=float('inf')
+                            )
+                        else:
+                            # Configuración conservadora para CPU o modo robusto
+                            beam_size, best_of = 1, 1
+                            vad_params = dict(
+                                min_silence_duration_ms=500,
+                                threshold=0.5,
+                                min_speech_duration_ms=250
+                            )
+                        
+                        # Transcribir con configuración adaptativa
+                        segments, info = model.transcribe(
+                            processed_path,
+                            language=language,
+                            beam_size=beam_size,
+                            best_of=best_of,
+                            temperature=0.0,
+                            condition_on_previous_text=False,
+                            vad_filter=True,
+                            vad_parameters=vad_params,
+                            word_timestamps=True,
+                            compression_ratio_threshold=2.4,
+                            log_prob_threshold=-1.0,
+                            no_speech_threshold=0.6
+                        )
+                        
+                        # Si llegamos aquí, la transcripción fue exitosa
+                        break
+                        
+                    except Exception as e:
+                        last_error = e
+                        error_msg = str(e)
+                        logger.warning(f"Error en intento {attempt + 1}: {error_msg}")
+                        
+                        # Si es un error de CUDA/cuDNN y tenemos más intentos
+                        if attempt < max_retries - 1 and ('cudnn' in error_msg.lower() or 'cuda' in error_msg.lower()):
+                            logger.info("🔄 Error relacionado con CUDA, reintentando con CPU...")
+                            CONFIG['device'] = 'cpu'
+                            continue
+                        
+                        # Si es el último intento, lanzar excepción
+                        if attempt == max_retries - 1:
+                            raise last_error
+                
+                # Procesar segmentos y ensamblar texto para transcripción normal
+                transcription_progress[job_id].update({
+                    'stage': 'Procesando segmentos...',
+                    'progress': 50,
+                    'status': 'transcribiendo'
+                })
+                
+                full_text = ""
+                transcription_segments = []
+                segment_count = 0
+                processed_duration = 0
+                
+                for i, segment in enumerate(segments):
+                    segment_count += 1
+                    processed_duration += segment.end - segment.start
+                    full_text += segment.text
                     
-                    # Limpiar memoria cada cierto número de segmentos en GPU
-                    if CONFIG['device'] == 'cuda' and (i + 1) % 50 == 0:
-                        try:
-                            import torch
-                            torch.cuda.empty_cache()
-                        except:
-                            pass
+                    # Crear datos del segmento
+                    transcription_segments.append({
+                        'start': segment.start,
+                        'end': segment.end,
+                        'text': segment.text.strip(),
+                        'confidence': getattr(segment, 'avg_logprob', 0.0)
+                    })
+                    
+                    # Actualizar progreso periódicamente
+                    if i % 10 == 0:  # Cada 10 segmentos
+                        progress = 50 + int((processed_duration / audio_info['duration']) * 40)
+                        remaining_time = None
+                        if processed_duration > 0:
+                            elapsed = time.time() - start_time
+                            rate = processed_duration / elapsed
+                            remaining_duration = audio_info['duration'] - processed_duration
+                            remaining_time = remaining_duration / rate / 60  # en minutos
+                        
+                        transcription_progress[job_id].update({
+                            'progress': min(progress, 90),
+                            'current_segment': segment_count,
+                            'processed_duration': processed_duration,
+                            'estimated_time_remaining': remaining_time
+                        })
+                
+                logger.info(f"Progreso: {segment_count}/{segment_count} segmentos (90.0%, quedan ~0.0 min)")
+                full_text = full_text.strip()
             
+            # Código común para finalización
             transcription_progress[job_id].update({
                 'stage': 'Finalizando...',
                 'progress': 95
