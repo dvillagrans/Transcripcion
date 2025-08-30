@@ -143,6 +143,7 @@ CONFIG = {
     'supported_formats': ['.mp3', '.wav', '.flac', '.m4a', '.ogg'],
     'max_file_size': 500 * 1024 * 1024,  # 500MB para archivos largos
     'default_model': 'medium',
+    'default_language': 'es',  # Español por defecto
     'device': device,
     'compute_type': compute_type,
     'robust_mode': ROBUST_MODE
@@ -301,6 +302,10 @@ class TranscriptionService:
     
     def transcribe_segments(self, segment_paths: list, job_id: str, model, language: str = None) -> list:
         """Transcribir cada segmento por separado"""
+        # Usar idioma por defecto si no se especifica
+        if language is None:
+            language = CONFIG['default_language']
+            
         transcriptions = []
         total_segments = len(segment_paths)
         
@@ -404,6 +409,10 @@ class TranscriptionService:
                         language: str = None, generate_summary: bool = False) -> Dict[str, Any]:
         """Transcribir archivo de audio con seguimiento de progreso"""
         start_time = time.time()
+        
+        # Usar idioma por defecto si no se especifica
+        if language is None:
+            language = CONFIG['default_language']
         
         # Generar ID único si no se proporciona
         if not job_id:

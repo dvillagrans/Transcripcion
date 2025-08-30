@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileAudio, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import SegmentProgressDisplay from '@/components/SegmentProgressDisplay';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface ProcessingJob {
   jobId: string;
@@ -29,7 +30,16 @@ const ProcessPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('es');
   const navigate = useNavigate();
+
+  // Cargar configuración guardada al montar el componente
+  useEffect(() => {
+    const config = JSON.parse(localStorage.getItem('audioProcessingConfig') || '{}');
+    if (config.language) {
+      setSelectedLanguage(config.language);
+    }
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -70,6 +80,7 @@ const ProcessPage: React.FC = () => {
       // Get config from localStorage
       const config = JSON.parse(localStorage.getItem('audioProcessingConfig') || '{}');
       formData.append('whisperModel', config.whisperModel || 'medium');
+      formData.append('language', selectedLanguage || config.language || 'es');
       formData.append('generateSummary', config.generateSummary || false);
 
       const response = await fetch('/api/audio/upload', {
@@ -279,6 +290,21 @@ const ProcessPage: React.FC = () => {
                 <AlertTitle>Error al procesar archivo</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+
+            {/* Language Selector */}
+            {selectedFile && !currentJob && (
+              <Card className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 animate-slide-up">
+                <CardContent className="p-6">
+                  <div className="max-w-sm mx-auto">
+                    <LanguageSelector
+                      value={selectedLanguage}
+                      onChange={setSelectedLanguage}
+                      className="space-y-3"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Upload Button */}

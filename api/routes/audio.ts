@@ -54,7 +54,7 @@ router.post('/upload', upload.single('audioFile'), async (req: Request, res: Res
       });
     }
 
-    const { whisperModel = 'medium', generateSummary = false } = req.body;
+    const { whisperModel = 'medium', generateSummary = false, language = 'es' } = req.body;
     
     // Create job in database
     const job = await JobService.createJob({
@@ -65,6 +65,7 @@ router.post('/upload', upload.single('audioFile'), async (req: Request, res: Res
     // Start processing asynchronously
     AudioProcessingService.processAudio(job.id, req.file.path, {
       whisperModel,
+      language,
       generateSummary: generateSummary === 'true' || generateSummary === true
     }).catch(error => {
       console.error('Audio processing error:', error);

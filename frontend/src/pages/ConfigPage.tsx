@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Settings, Save, RotateCcw } from 'lucide-react';
+import LanguageSelector from '../components/LanguageSelector';
 
 interface ConfigState {
   whisperModel: string;
+  language: string;
   generateSummary: boolean;
   maxFileSize: number;
   autoProcess: boolean;
@@ -11,6 +13,7 @@ interface ConfigState {
 const ConfigPage: React.FC = () => {
   const [config, setConfig] = useState<ConfigState>({
     whisperModel: 'medium',
+    language: 'es',
     generateSummary: true,
     maxFileSize: 100,
     autoProcess: false
@@ -28,6 +31,7 @@ const ConfigPage: React.FC = () => {
   const handleReset = () => {
     const defaultConfig: ConfigState = {
       whisperModel: 'medium',
+      language: 'es',
       generateSummary: true,
       maxFileSize: 100,
       autoProcess: false
@@ -102,6 +106,21 @@ const ConfigPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Language Selection */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">🌍 Idioma de Transcripción</h3>
+                <p className="text-sm text-gray-600">Selecciona el idioma principal del audio para mejorar la precisión</p>
+              </div>
+              
+              <div className="max-w-md mx-auto">
+                <LanguageSelector
+                  value={config.language}
+                  onChange={(language) => updateConfig('language', language)}
+                />
               </div>
             </div>
 

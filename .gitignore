@@ -274,12 +274,37 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 transcription.log
+audio_processing.log
+*.log.*
+
+# Redis dump files
+dump.rdb
+appendonly.aof
+redis.log
+
+# Docker volumes and data
+docker_data/
+postgres_data/
+redis_data/
 
 # Uploads and temporary files
 uploads/*
 !uploads/.gitkeep
 temp/
 tmp/
+
+# Audio processing segments and outputs
+segments/
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+*.aac
+*.wma
+*_processed_*
+*_segment_*
+transcription_*.txt
 
 # Models and large files
 models/*

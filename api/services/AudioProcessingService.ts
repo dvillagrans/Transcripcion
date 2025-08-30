@@ -11,6 +11,7 @@ export class AudioProcessingService {
 
   static async processAudio(jobId: string, filePath: string, options: {
     whisperModel?: string;
+    language?: string;
     generateSummary?: boolean;
   } = {}): Promise<void> {
     try {
@@ -65,6 +66,7 @@ export class AudioProcessingService {
 
   private static async transcribeWithFasterWhisper(jobId: string, filePath: string, options: {
     whisperModel?: string;
+    language?: string;
     generateSummary?: boolean;
   }): Promise<void> {
     try {
@@ -74,7 +76,7 @@ export class AudioProcessingService {
       const transcriptionRequest = {
         file_path: path.resolve(filePath),
         model: options.whisperModel || 'medium',
-        language: null, // Auto-detect
+        language: options.language || 'es', // Español por defecto
         generate_summary: options.generateSummary || false,
         job_id: jobId // ¡IMPORTANTE! Pasar job_id para tracking de progreso
       };
