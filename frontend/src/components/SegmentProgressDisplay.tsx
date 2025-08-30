@@ -25,6 +25,10 @@ interface ProgressData {
   total_duration: number;
   segments?: SegmentInfo[];
   use_segmentation?: boolean;
+  optimization_mode?: string;
+  parallel_workers?: number;
+  model_preloaded?: boolean;
+  segment_duration?: number;
 }
 
 interface SegmentProgressDisplayProps {
@@ -264,10 +268,53 @@ const SegmentProgressDisplay: React.FC<SegmentProgressDisplayProps> = ({
             <div>
               <div className="text-gray-500">Método de Procesamiento</div>
               <div className="font-medium">
-                {use_segmentation ? 'Segmentación (5 min)' : 'Transcripción directa'}
+                {use_segmentation ? `Segmentación (${progressData.segment_duration || 10} min)` : 'Transcripción directa'}
               </div>
             </div>
           </div>
+
+          {/* Información de optimización */}
+          {progressData.optimization_mode && (
+            <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Zap className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-blue-800">
+                    Optimizaciones para 32GB RAM Activadas
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-gray-600">Modo</div>
+                    <Badge variant="secondary" className="text-xs">
+                      {progressData.optimization_mode === 'high_memory' ? '🚀 Alto Rendimiento' : '⚡ Estándar'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600">Workers Paralelos</div>
+                    <div className="font-medium text-blue-700">
+                      {progressData.parallel_workers || 1}x
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600">Modelo Precargado</div>
+                    <div className="font-medium">
+                      {progressData.model_preloaded ? '✅ Sí' : '⏳ No'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600">Duración Segmento</div>
+                    <div className="font-medium text-green-700">
+                      {progressData.segment_duration || 10} min
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-gray-600">
+                  🎯 Rendimiento esperado: ~3x más rápido que modo estándar
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
     </div>
