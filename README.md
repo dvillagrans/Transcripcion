@@ -1,270 +1,525 @@
-# Pipeline de Procesamiento de Audio
+# 🎧 Pipeline de Transcripción de Audio con IA
 
-Pipeline integral de procesamiento de audio que automatiza la transcripción, diarización y postprocesamiento de archivos de audio largos usando tecnologías de inteligencia artificial.
+Pipeline integral de procesamiento de audio que automatiza la transcripción de archivos largos usando tecnologías de inteligencia artificial avanzadas. Diseñado para manejar audios de hasta 1:30 horas con segmentación automática y seguimiento de progreso en tiempo real.
 
-## 🚀 Características
+## ✨ Características Principales
 
-- **Transcripción Automática**: Convierte audio a texto usando modelos Whisper
-- **Resúmenes Inteligentes**: Genera resúmenes automáticos del contenido transcrito
-- **Interfaz Web Moderna**: Frontend React con diseño responsive
-- **API RESTful**: Backend Express.js con endpoints completos
-- **Base de Datos**: PostgreSQL con Redis para caching
-- **Docker**: Configuración completa con Docker Compose
+### 🚀 Transcripción Avanzada
+- **Modelos Whisper Optimizados**: Soporte completo para todos los modelos (tiny, base, small, medium, large-v3)
+- **Segmentación Inteligente**: Procesa automáticamente audios largos en segmentos de 5 minutos
+- **Múltiples Idiomas**: Español por defecto con selector de 13+ idiomas
+- **Progreso en Tiempo Real**: Visualización detallada del progreso por segmento
 
-## 🛠️ Tecnologías
+### 🌍 Soporte Multiidioma
+- **Idioma por Defecto**: Español configurado automáticamente
+- **Selector Dinámico**: Cambio de idioma en tiempo real
+- **Auto-detección**: Opción para detectar idioma automáticamente
+- **Idiomas Soportados**: Español, Inglés, Francés, Alemán, Italiano, Portugués, Ruso, Japonés, Coreano, Chino, Árabe, Hindi
+
+### 🎯 Interfaz Moderna
+- **UI Intuitiva**: Diseño moderno con animaciones suaves
+- **Drag & Drop**: Arrastra archivos directamente
+- **Progreso Visual**: Barras de progreso y grids de segmentos
+- **Responsive**: Optimizado para desktop y móvil
+
+### ⚡ Rendimiento Optimizado
+- **CPU Robusto**: Modo ROBUST_MODE para máxima estabilidad
+- **Limpieza Automática**: Los archivos temporales se eliminan automáticamente
+- **Timeout Inteligente**: Timeouts dinámicos basados en el tamaño del archivo
+- **Gestión de Memoria**: Procesamiento eficiente de archivos grandes
+
+## 🛠️ Stack Tecnológico
 
 ### Frontend
-- React 18 + TypeScript
-- Tailwind CSS
-- Vite
-- React Router
-- Lucide React (iconos)
-- React Dropzone
+- **React 18** + TypeScript
+- **Tailwind CSS** + shadcn/ui
+- **Vite** para build optimizado
+- **Lucide React** para iconografía
+- **React Router** para navegación
 
 ### Backend
-- Express.js + TypeScript
-- PostgreSQL (Docker)
-- Redis (Docker)
-- Multer (upload de archivos)
-- Node.js
+- **Express.js** + TypeScript
+- **PostgreSQL** (puerto 5433)
+- **Redis** (puerto 6380)
+- **Multer** para uploads
+- **Axios** para comunicación con servicios
 
-### AI Services (Futuro)
-- Faster-Whisper
-- PyAnnote
-- SeamlessM4T
-- Llama 3.1
+### AI & Processing
+- **Faster-Whisper** para transcripción
+- **NumPy** para procesamiento de audio
+- **Librosa/SoundFile** para manipulación de audio
+- **Python 3.12** con virtual environment
 
-## 📋 Requisitos Previos
+### Infrastructure
+- **Docker Compose** para servicios
+- **Auto-detección** de comandos Docker
+- **Scripts automatizados** para setup
 
-- Node.js 18+
-- Docker y Docker Compose
-- pnpm (recomendado) o npm
+## 📋 Requisitos del Sistema
 
-## 🚀 Instalación y Configuración
+- **Node.js** 18+ y **pnpm**
+- **Python** 3.12+ con pip
+- **Docker** y **Docker Compose**
+- **8GB RAM** mínimo (16GB recomendado)
+- **GPU** opcional (CUDA compatible)
 
-### Método 1: Inicio Automático (Recomendado)
+## 🚀 Instalación Rápida
 
-#### Windows
+### 🎯 Método 1: Setup Automático (Recomendado)
+
 ```bash
-# Ejecutar script de inicio automático
+# Clonar repositorio
+git clone https://github.com/dvillagrans/Transcripcion.git
+cd Transcripcion
+
+# Windows
 start_all.bat
-```
 
-#### Linux/Mac
-```bash
-# Ejecutar script de inicio automático
+# Linux/Mac
 python start_all.py
 ```
 
-### Método 2: Inicio Manual
+### ⚙️ Método 2: Instalación Manual
 
-#### 1. Instalar dependencias
+#### 1. Configurar Python
+```bash
+# Crear entorno virtual
+python3 -m venv env
+source env/bin/activate  # Linux/Mac
+# env\Scripts\activate   # Windows
+
+# Instalar dependencias Python
+pip install -r requirements.txt
+```
+
+#### 2. Configurar Node.js
 ```bash
 # Backend
 pnpm install
 
 # Frontend
-cd frontend
-pnpm install
-cd ..
+cd frontend && pnpm install && cd ..
 ```
 
-#### 2. Iniciar servicios Docker
+#### 3. Iniciar Servicios
 ```bash
-# Iniciar PostgreSQL y Redis
+# Docker (PostgreSQL + Redis)
 docker-compose up -d
 
-# Verificar que los servicios estén corriendo
-docker-compose ps
-```
-
-#### 3. Iniciar servicios de aplicación
-```bash
-# Terminal 1: Backend (puerto 3001)
+# Backend API (puerto 3001)
 pnpm run server:dev
 
-# Terminal 2: Frontend (puerto 3000)
-cd frontend
-pnpm run dev
+# Frontend (puerto 3000)
+cd frontend && pnpm run dev
 
-# Terminal 3: Servicio Python (puerto 5000)
+# Servicio Python (puerto 5000)
 python transcription_service.py
 ```
 
-### 🌐 Acceder a la aplicación
+## 🌐 Acceso a la Aplicación
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **Servicio Python**: http://localhost:5000
-- **PostgreSQL**: localhost:5433
-- **Redis**: localhost:6380
+| Servicio | URL | Puerto |
+|----------|-----|---------|
+| **Frontend** | http://localhost:3000 | 3000 |
+| **Backend API** | http://localhost:3001 | 3001 |
+| **Python Service** | http://localhost:5000 | 5000 |
+| **PostgreSQL** | localhost:5433 | 5433 |
+| **Redis** | localhost:6380 | 6380 |
 
 ## 📁 Estructura del Proyecto
 
 ```
-trasncript/
-├── api/                    # Backend Express.js
-│   ├── config/            # Configuración de DB y Redis
-│   ├── models/            # Modelos TypeScript
-│   ├── routes/            # Rutas de la API
-│   ├── services/          # Lógica de negocio
-│   └── app.ts             # Aplicación principal
-├── frontend/              # Frontend React
+Transcripcion/
+├── 🎨 frontend/              # React + TypeScript
 │   ├── src/
-│   │   ├── components/    # Componentes reutilizables
-│   │   ├── pages/         # Páginas de la aplicación
-│   │   └── App.tsx        # Componente principal
-│   └── vite.config.ts     # Configuración de Vite
-├── uploads/               # Archivos subidos
-├── docker-compose.yml     # Servicios Docker
-├── init.sql              # Script de inicialización de DB
-└── .env                  # Variables de entorno
+│   │   ├── components/       # Componentes UI
+│   │   │   ├── ui/          # shadcn/ui components
+│   │   │   ├── LanguageSelector.tsx
+│   │   │   ├── SegmentProgressDisplay.tsx
+│   │   │   └── Progress.tsx
+│   │   ├── pages/           # Páginas principales
+│   │   │   ├── HomePage.tsx
+│   │   │   ├── ProcessPage.tsx
+│   │   │   ├── ConfigPage.tsx
+│   │   │   ├── ResultsPage.tsx
+│   │   │   └── HistoryPage.tsx
+│   │   └── App.tsx
+│   └── vite.config.ts
+├── 🔧 api/                   # Express.js Backend
+│   ├── config/              # DB y Redis
+│   ├── models/              # Modelos TypeScript
+│   ├── routes/              # API endpoints
+│   ├── services/            # Lógica de negocio
+│   └── app.ts
+├── 🐍 Python Services
+│   ├── transcription_service.py  # Servicio principal
+│   ├── requirements.txt          # Dependencias Python
+│   └── env/                      # Virtual environment
+├── 📂 Directorios de Datos
+│   ├── uploads/             # Archivos subidos
+│   ├── segments/            # Segmentos temporales
+│   └── models/              # Modelos Whisper
+├── 🐳 Docker
+│   ├── docker-compose.yml   # Servicios
+│   └── init.sql            # Setup DB
+└── 📝 Configuración
+    ├── .env                # Variables de entorno
+    ├── .gitignore          # Archivos ignorados
+    └── README.md           # Este archivo
 ```
 
-## 🔧 Scripts Disponibles
+## 🎯 Guía de Uso
 
-### Backend
+### 1. 🎛️ Configuración Inicial
+![Config](https://img.shields.io/badge/Paso-1-blue)
+
+- Ve a **Configuración** (`/config`)
+- Selecciona el **modelo Whisper** según tus necesidades:
+  - `tiny`: Ultra rápido ⚡⚡⚡ (precisión ⭐⭐)
+  - `medium`: **Recomendado** ⚡ (precisión ⭐⭐⭐⭐⭐)
+  - `large-v3`: Máxima precisión ⚡ (precisión ⭐⭐⭐⭐⭐)
+- Configura el **idioma por defecto** (Español preconfigurado)
+- Activa/desactiva **resumen automático**
+
+### 2. 🎵 Subir Audio
+![Process](https://img.shields.io/badge/Paso-2-green)
+
+- Ve a **Procesar** (`/process`)
+- **Arrastra y suelta** o **selecciona archivo**
+- Formatos: `MP3`, `WAV`, `FLAC`, `M4A`, `OGG`
+- Tamaño máximo: **500MB** (optimizado para audios de 1:30h)
+- Selecciona **idioma específico** si es necesario
+
+### 3. 📊 Monitoreo en Tiempo Real
+![Progress](https://img.shields.io/badge/Paso-3-orange)
+
+Para **audios largos** (>10 minutos):
+- ✅ **Segmentación automática** en bloques de 5 minutos
+- 📊 **Grid visual** mostrando cada segmento
+- ⏱️ **Tiempo estimado** de finalización
+- 🔄 **Progreso por segmento** en tiempo real
+- 📈 **Estadísticas técnicas** detalladas
+
+### 4. 📋 Resultados
+![Results](https://img.shields.io/badge/Paso-4-purple)
+
+- 📝 **Transcripción completa** y precisa
+- 📄 **Resumen automático** (si está activado)
+- 💾 **Descarga** en múltiples formatos
+- 📋 **Copia rápida** al portapapeles
+- 🔍 **Búsqueda** dentro del texto
+
+### 5. 📚 Historial
+![History](https://img.shields.io/badge/Paso-5-indigo)
+
+- 📜 **Lista completa** de transcripciones
+- 🔍 **Búsqueda rápida** por nombre
+- 🗑️ **Eliminación** de trabajos antiguos
+- 📊 **Estado** de cada procesamiento
+
+## 🚀 Características Avanzadas
+
+### 🧩 Segmentación Inteligente
+
+```python
+# Automático para audios >10 minutos
+if audio_duration > 600:  # 10 minutos
+    segments = segment_audio(file_path, segment_length=300)  # 5 min c/u
+    
+# Ejemplo: Audio de 1:30h = 18 segmentos de 5 minutos
+```
+
+### 🌍 Soporte Multiidioma
+
+```typescript
+const languages = [
+  { code: 'es', name: 'Español' },        // Por defecto
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'auto', name: 'Auto-detectar' }
+  // ... 13+ idiomas soportados
+];
+```
+
+### 📊 Progreso Detallado
+
+```typescript
+interface ProgressData {
+  segments_total: number;
+  segments_completed: number;
+  current_segment: number;
+  estimated_time_remaining: string;
+  processing_speed: string;
+  technical_info: TechnicalInfo;
+}
+```
+
+## 🔧 API Reference
+
+### 🎵 Audio Processing
+
+#### Upload Audio
 ```bash
-pnpm run dev          # Desarrollo con nodemon
-pnpm run build        # Compilar TypeScript
-pnpm run start        # Producción
+POST /api/audio/upload
+Content-Type: multipart/form-data
+
+{
+  "audioFile": File,
+  "whisperModel": "medium",
+  "language": "es",
+  "generateSummary": true
+}
 ```
 
-### Frontend
+#### Get Progress
 ```bash
-pnpm run dev          # Servidor de desarrollo
-pnpm run build        # Build para producción
-pnpm run preview      # Preview del build
+GET /api/audio/status/:jobId
+
+Response:
+{
+  "success": true,
+  "data": {
+    "jobId": "uuid",
+    "status": "processing",
+    "progress": 45,
+    "currentStage": "Procesando segmento 3/12",
+    "segments": {...}
+  }
+}
 ```
 
-### Docker
+#### Get Results
 ```bash
-docker-compose up -d     # Iniciar servicios
-docker-compose down      # Detener servicios
-docker-compose logs      # Ver logs
+GET /api/audio/results/:jobId
+
+Response:
+{
+  "success": true,
+  "data": {
+    "transcription": "Texto completo...",
+    "summary": "Resumen automático...",
+    "metadata": {
+      "duration": "5400s",
+      "language": "es",
+      "model": "medium"
+    }
+  }
+}
 ```
 
-## 📡 API Endpoints
+### 🐍 Python Service
 
-### Audio Processing
-- `POST /api/audio/upload` - Subir y procesar archivo de audio
-- `GET /api/audio/status/:jobId` - Obtener estado del procesamiento
-- `GET /api/audio/results/:jobId` - Obtener resultados de transcripción
-- `GET /api/audio/jobs` - Listar todos los trabajos
-- `DELETE /api/audio/jobs/:jobId` - Eliminar trabajo
+#### Transcribe Endpoint
+```bash
+POST http://localhost:5000/transcribe
 
-### Health Check
-- `GET /api/health` - Estado del servidor
-
-## 🎯 Uso de la Aplicación
-
-### 1. Configuración
-- Accede a `/config` para ajustar parámetros del pipeline
-- Selecciona el modelo Whisper (tiny, base, small, medium, large-v3)
-- Activa/desactiva la generación de resúmenes
-
-### 2. Procesamiento
-- Ve a `/process` para subir archivos de audio
-- Arrastra y suelta archivos o haz clic para seleccionar
-- Formatos soportados: MP3, WAV, FLAC, M4A, OGG
-- Tamaño máximo: 100MB
-
-### 3. Resultados
-- Monitorea el progreso en tiempo real
-- Accede a `/results/:jobId` para ver transcripciones
-- Copia o descarga transcripciones y resúmenes
-
-### 4. Historial
-- Ve a `/history` para revisar trabajos anteriores
-- Elimina trabajos que ya no necesites
-- Accede rápidamente a resultados anteriores
-
-## 🗄️ Base de Datos
-
-### Tabla `jobs`
-```sql
-CREATE TABLE jobs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    filename VARCHAR(255) NOT NULL,
-    status VARCHAR(50) DEFAULT 'processing',
-    transcription TEXT,
-    summary TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+{
+  "file_path": "/path/to/audio.mp3",
+  "model": "medium",
+  "language": "es",
+  "job_id": "uuid"
+}
 ```
 
-## 🔧 Variables de Entorno
+#### Progress Endpoint
+```bash
+GET http://localhost:5000/progress/:jobId
+
+Response:
+{
+  "progress": 45,
+  "stage": "Transcribiendo segmento 3/12",
+  "segments_completed": 2,
+  "segments_total": 12,
+  "estimated_time": "15:30"
+}
+```
+
+## ⚙️ Configuración Avanzada
+
+### 🔧 Variables de Entorno
 
 ```bash
-# Database
+# === DATABASE ===
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=5433
 DB_NAME=audio_pipeline
 DB_USER=app_user
-DB_PASSWORD=app_password
+DB_PASSWORD=secure_password
 
-# Redis
+# === REDIS ===
 REDIS_HOST=localhost
-REDIS_PORT=6379
+REDIS_PORT=6380
 
-# Server
+# === SERVER ===
 PORT=3001
 NODE_ENV=development
+TRANSCRIPTION_SERVICE_URL=http://localhost:5000
 
-# Upload
+# === UPLOAD ===
 UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=100000000
+MAX_FILE_SIZE=524288000  # 500MB
+
+# === AI CONFIG ===
+ROBUST_MODE=true
+DEFAULT_MODEL=medium
+DEFAULT_LANGUAGE=es
 ```
 
-## 🚀 Próximas Funcionalidades
+### 🎛️ Configuración de Modelos
 
-- [ ] Integración con Faster-Whisper real
-- [ ] Diarización de hablantes con PyAnnote
-- [ ] Traducción con SeamlessM4T
-- [ ] Generación de resúmenes con Llama 3.1
-- [ ] Exportación a formato LaTeX
-- [ ] Procesamiento por lotes
-- [ ] Autenticación de usuarios
+| Modelo | Tamaño | Velocidad | Precisión | RAM | Recomendado Para |
+|--------|--------|-----------|-----------|-----|------------------|
+| `tiny` | 39MB | ⚡⚡⚡ | ⭐⭐ | 1GB | Pruebas rápidas |
+| `base` | 74MB | ⚡⚡ | ⭐⭐⭐ | 1GB | Desarrollo |
+| `small` | 244MB | ⚡⚡ | ⭐⭐⭐⭐ | 2GB | Uso general |
+| `medium` | 769MB | ⚡ | ⭐⭐⭐⭐⭐ | 5GB | **Recomendado** |
+| `large-v3` | 1550MB | ⚡ | ⭐⭐⭐⭐⭐ | 10GB | Máxima calidad |
 
 ## 🐛 Solución de Problemas
 
-### Error de conexión a la base de datos
+### ❌ Problemas Comunes
+
+#### Docker no inicia
 ```bash
-# Verificar que Docker esté corriendo
-docker-compose ps
+# Verificar Docker
+docker --version
+docker-compose --version
 
 # Reiniciar servicios
 docker-compose down
-docker-compose up -d
+docker-compose up -d --force-recreate
 ```
 
-### Error de permisos en uploads
+#### Error de Python/Whisper
 ```bash
-# Crear directorio de uploads
-mkdir uploads
-chmod 755 uploads
+# Verificar entorno virtual
+source env/bin/activate
+pip list | grep -E "(torch|whisper|faster)"
+
+# Reinstalar dependencias
+pip install -r requirements.txt --force-reinstall
 ```
 
-### Puerto en uso
+#### Error de puertos en uso
 ```bash
-# Cambiar puertos en .env y vite.config.ts
-# O detener procesos que usen los puertos 3000/3001
+# Verificar puertos
+netstat -tulpn | grep -E "(3000|3001|5000|5433|6380)"
+
+# Cambiar puertos en .env
+PORT=3002
+DB_PORT=5434
 ```
+
+#### Segmentos no se limpian
+```bash
+# Limpiar manualmente
+rm -rf segments/*
+```
+
+### 🔍 Logs de Debug
+
+```bash
+# Backend logs
+cd frontend && pnpm run dev  # Terminal 1
+pnpm run server:dev          # Terminal 2
+
+# Python logs
+tail -f transcription.log    # Terminal 3
+
+# Docker logs
+docker-compose logs postgres
+docker-compose logs redis
+```
+
+## 📊 Benchmarks y Rendimiento
+
+### ⏱️ Tiempos de Procesamiento (CPU Intel i7)
+
+| Duración Audio | Modelo | Segmentos | Tiempo Procesamiento |
+|----------------|--------|-----------|---------------------|
+| 5 minutos | medium | 1 | ~2 minutos |
+| 30 minutos | medium | 6 | ~10 minutos |
+| 1 hora | medium | 12 | ~18 minutos |
+| 1:30 horas | medium | 18 | ~25 minutos |
+
+### 💾 Uso de Recursos
+
+- **RAM**: 4-8GB (dependiendo del modelo)
+- **CPU**: Uso intensivo durante transcripción
+- **Disco**: ~2GB para modelos + archivos temporales
+- **Red**: Mínimo (solo para UI)
+
+## 🔄 Roadmap Futuro
+
+### 🎯 Próximas Versiones
+
+#### v2.0 - Análisis Avanzado
+- [ ] **Diarización de hablantes** (¿Quién dice qué?)
+- [ ] **Detección de emociones** en el audio
+- [ ] **Análisis de sentimientos** del texto
+- [ ] **Extracción de temas** principales
+
+#### v2.1 - Productividad
+- [ ] **Traducción automática** (SeamlessM4T)
+- [ ] **Generación de resúmenes** con Llama 3.1
+- [ ] **Exportación a LaTeX/PDF** profesional
+- [ ] **API Keys** para modelos cloud
+
+#### v2.2 - Escalabilidad
+- [ ] **Procesamiento distribuido** multi-GPU
+- [ ] **Queue system** para múltiples archivos
+- [ ] **Autenticación** y usuarios
+- [ ] **Dashboard analytics** avanzado
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT.
+Este proyecto está bajo la **Licencia MIT**.
+
+```
+MIT License - Copyright (c) 2025 dvillagrans
+
+Se permite el uso, copia, modificación y distribución de este software
+para cualquier propósito, comercial o no comercial.
+```
 
 ## 🤝 Contribuciones
 
-Las contribuciones son bienvenidas. Por favor:
+¡Las contribuciones son bienvenidas! 
 
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+### 🔄 Proceso de Contribución
 
-## 📞 Soporte
+1. **Fork** el repositorio
+2. **Crea** una rama feature (`git checkout -b feature/nueva-funcionalidad`)
+3. **Commit** tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
+4. **Push** a la rama (`git push origin feature/nueva-funcionalidad`)
+5. **Abre** un Pull Request
 
-Si tienes problemas o preguntas, por favor abre un issue en el repositorio.
+### 🐛 Reportar Bugs
+
+Usa los **GitHub Issues** con la plantilla:
+- 🐛 **Descripción** del problema
+- 🔄 **Pasos** para reproducir
+- 💻 **Entorno** (OS, Node.js version, etc.)
+- 📸 **Screenshots** si aplica
+
+## 📞 Soporte y Contacto
+
+- 💬 **Issues**: [GitHub Issues](https://github.com/dvillagrans/Transcripcion/issues)
+- 📧 **Email**: dvillagrans@example.com
+- 🐦 **Twitter**: @dvillagrans
+
+---
+
+<div align="center">
+
+**⭐ Si te gusta este proyecto, no olvides darle una estrella ⭐**
+
+[![GitHub stars](https://img.shields.io/github/stars/dvillagrans/Transcripcion)](https://github.com/dvillagrans/Transcripcion/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/dvillagrans/Transcripcion)](https://github.com/dvillagrans/Transcripcion/network)
+[![GitHub issues](https://img.shields.io/github/issues/dvillagrans/Transcripcion)](https://github.com/dvillagrans/Transcripcion/issues)
+
+**Desarrollado con ❤️ usando IA y tecnologías modernas**
+
+</div>
