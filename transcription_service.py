@@ -26,6 +26,7 @@ import soundfile as sf
 import torch
 import numpy as np
 from dotenv import load_dotenv
+import ollama
 
 # Cargar variables de entorno
 load_dotenv()
@@ -158,6 +159,10 @@ CONFIG = {
     'segment_length': 600,  # 10 minutos por segmento (era 300)
     'parallel_workers': 3,  # Procesar 3 segmentos simultáneamente
     'preload_model': True,  # Mantener modelo en memoria
+    # Configuración Ollama para resúmenes avanzados
+    'use_ollama': os.getenv('USE_OLLAMA', 'true').lower() in ['true', '1', 'yes'],
+    'ollama_model': os.getenv('OLLAMA_MODEL', 'llama3.1:8b'),
+    'ollama_url': os.getenv('OLLAMA_URL', 'http://localhost:11434'),
 }
 
 # Logger configuration
@@ -965,12 +970,117 @@ class TranscriptionService:
             }
     
     def generate_summary(self, text: str) -> str:
-        """Generar resumen inteligente del texto transcrito"""
+        """Generar resumen inteligente del texto transcrito usando Ollama LLM"""
         if not text or not text.strip():
             return "No hay contenido para resumir."
             
         text = text.strip()
         
+        # Verificar si Ollama está habilitado
+        if not CONFIG.get('use_ollama', True):
+            logger.info("📝 Ollama deshabilitado, usando resumen simple")
+            return self._generate_simple_summary(text)
+        
+        # Para texto muy corto, usar prompt adaptado
+        if len(text) < 100:
+            return self._generate_llm_summary_short(text)
+        else:
+            return self._generate_llm_summary_long(text)
+    
+    def _generate_llm_summary_short(self, text: str) -> str:
+        """Generar resumen para textos cortos usando LLM"""
+        try:
+            logger.info(f"🧠 Generando resumen de texto corto con {CONFIG['ollama_model']}...")
+            
+            prompt = f"""Eres un experto en resumir contenido. Analiza el siguiente texto transcrito de audio y haz un resumen breve y claro en español.
+
+INSTRUCCIONES:
+- Si el texto es muy corto, parafrasea y mejora la información disponible
+- Mantén un lenguaje claro y profesional  
+- Identifica los puntos clave aunque sean pocos
+- Máximo 100 palabras
+
+TEXTO A RESUMIR:
+{text}
+
+RESUMEN:"""
+
+            response = ollama.chat(
+                model=CONFIG['ollama_model'],
+                messages=[{
+                    'role': 'user', 
+                    'content': prompt
+                }],
+                options={
+                    'temperature': 0.3,
+                    'num_predict': 150,
+                    'top_p': 0.9
+                }
+            )
+            
+            summary = response['message']['content'].strip()
+            
+            # Agregar estadísticas
+            word_count = len(text.split())
+            summary += f"\n\n📊 Estadísticas: ~{word_count} palabras en la transcripción original."
+            summary += f"\n🧠 Resumen generado con {CONFIG['ollama_model']}"
+            
+            logger.success("✅ Resumen de texto corto generado con LLM")
+            return summary
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error generando resumen corto con LLM: {e}")
+            return self._generate_simple_summary(text)
+    
+    def _generate_llm_summary_long(self, text: str) -> str:
+        """Generar resumen para textos largos usando LLM"""
+        try:
+            logger.info(f"🧠 Generando resumen de texto largo con {CONFIG['ollama_model']}...")
+            
+            prompt = f"""Eres un experto en resumir contenido. Resume el siguiente texto transcrito de audio en español de forma clara y concisa.
+
+INSTRUCCIONES:
+- Haz un resumen estructurado en 3-5 párrafos
+- Incluye los puntos más importantes y relevantes
+- Mantén un lenguaje claro y profesional
+- No agregues información que no esté en el texto original
+- Máximo 200-300 palabras
+
+TEXTO A RESUMIR:
+{text}
+
+RESUMEN:"""
+
+            response = ollama.chat(
+                model=CONFIG['ollama_model'],
+                messages=[{
+                    'role': 'user',
+                    'content': prompt
+                }],
+                options={
+                    'temperature': 0.3,
+                    'num_predict': 400,
+                    'top_p': 0.9
+                }
+            )
+            
+            summary = response['message']['content'].strip()
+            
+            # Agregar estadísticas
+            word_count = len(text.split())
+            sentence_count = len([s for s in text.split('.') if s.strip()])
+            summary += f"\n\n📊 Estadísticas: {sentence_count} oraciones, ~{word_count} palabras en la transcripción original."
+            summary += f"\n🧠 Resumen generado con {CONFIG['ollama_model']}"
+            
+            logger.success("✅ Resumen de texto largo generado con LLM")
+            return summary
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error generando resumen largo con LLM: {e}")
+            return self._generate_simple_summary(text)
+    
+    def _generate_simple_summary(self, text: str) -> str:
+        """Método de resumen simple como fallback"""
         # Dividir en oraciones
         sentences = [s.strip() for s in text.split('.') if s.strip()]
         total_sentences = len(sentences)
@@ -1191,6 +1301,7 @@ if __name__ == '__main__':
     logger.info(f"   • Segmentos de: {CONFIG.get('segment_length', 600)//60} minutos")
     logger.info(f"   • Preload modelo: {CONFIG.get('preload_model', False)}")
     logger.info(f"   • Dispositivo: {CONFIG['device']} ({CONFIG['compute_type']})")
+    logger.info(f"   • Resúmenes LLM: {'✅ ' + CONFIG['ollama_model'] if CONFIG.get('use_ollama') else '❌ Deshabilitado'}")
     
     # Precargar modelo por defecto
     try:
