@@ -113,7 +113,14 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
         jobId: job.id,
         status: job.status,
         progress: progress?.progress || (job.status === 'completed' ? 100 : 0),
-        currentStage: progress?.currentStage || job.status
+        currentStage: progress?.currentStage || job.status,
+        estimated_time_remaining: progress?.estimated_time_remaining,
+        current_segment: progress?.current_segment,
+        total_segments: progress?.total_segments,
+        processed_duration: progress?.processed_duration,
+        total_duration: progress?.total_duration,
+        use_segmentation: progress?.use_segmentation,
+        start_time: progress?.start_time
       }
     });
 

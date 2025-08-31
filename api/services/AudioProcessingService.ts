@@ -259,10 +259,44 @@ export class AudioProcessingService {
     try {
       const redisProgress = await redisClient.get(`progress:${jobId}`);
       if (redisProgress) {
-        return JSON.parse(redisProgress);
+        const parsedProgress = JSON.parse(redisProgress);
+        // Store in memory for faster subsequent access
+        this.progressMap.set(jobId, parsedProgress);
+        return parsedProgress;
       }
     } catch (error) {
       console.error('Error getting progress from Redis:', error);
+    }
+
+    // If not found in memory or Redis, try to get from Python transcription service
+    try {
+      const isServiceAvailable = await this.checkTranscriptionService();
+      if (isServiceAvailable) {
+        const response = await axios.get(`${this.TRANSCRIPTION_SERVICE_URL}/progress/${jobId}`, {
+          timeout: 5000
+        });
+        
+        if (response.data.success && response.data.progress) {
+          const progressData: JobProgress = {
+            jobId: jobId,
+            progress: response.data.progress.progress || 0,
+            currentStage: response.data.progress.current_stage || 'Procesando',
+            status: response.data.progress.status || 'processing'
+          };
+          
+          // Store in memory and Redis
+          this.progressMap.set(jobId, progressData);
+          try {
+            await redisClient.setex(`progress:${jobId}`, 300, JSON.stringify(progressData)); // 5 min TTL
+          } catch (redisError) {
+            console.error('Error storing progress in Redis:', redisError);
+          }
+          
+          return progressData;
+        }
+      }
+    } catch (error) {
+      console.error('Error getting progress from transcription service:', error);
     }
 
     return null;

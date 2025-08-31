@@ -25,4 +25,11 @@ export interface JobProgress {
   progress: number;
   currentStage: string;
   status: 'processing' | 'completed' | 'error';
+  estimated_time_remaining?: number;
+  current_segment?: number;
+  total_segments?: number;
+  processed_duration?: number;
+  total_duration?: number;
+  use_segmentation?: boolean;
+  start_time?: number;
 }

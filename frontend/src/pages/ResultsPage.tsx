@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FileText, Download, ArrowLeft, Copy, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface JobResult {
   jobId: string;
@@ -311,9 +313,39 @@ const ResultsPage: React.FC = () => {
               </div>
             </div>
             <div className="bg-gradient-to-br from-secondary-50 to-accent-50 rounded-2xl p-6 border border-secondary-200">
-              <p className="text-gray-800 whitespace-pre-wrap leading-relaxed text-lg">
-                {result.summary}
-              </p>
+              <div className="markdown-content">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({children}) => <h1 className="text-2xl font-bold text-gray-900 mb-4 mt-6 first:mt-0 border-b-2 border-purple-200 pb-2">{children}</h1>,
+                    h2: ({children}) => <h2 className="text-xl font-semibold text-gray-800 mb-3 mt-5 first:mt-0">{children}</h2>,
+                    h3: ({children}) => <h3 className="text-lg font-medium text-gray-800 mb-2 mt-4 first:mt-0">{children}</h3>,
+                    h4: ({children}) => <h4 className="text-base font-medium text-gray-800 mb-2 mt-3 first:mt-0">{children}</h4>,
+                    p: ({children}) => <p className="text-gray-700 mb-3 leading-relaxed text-base">{children}</p>,
+                    ul: ({children}) => <ul className="mb-4 space-y-2 text-gray-700">{children}</ul>,
+                    ol: ({children}) => <ol className="mb-4 space-y-2 text-gray-700">{children}</ol>,
+                    li: ({children}) => (
+                      <li className="text-gray-700 leading-relaxed flex items-start mb-2">
+                        <span className="text-purple-600 font-bold mr-3 min-w-[1rem] mt-0.5">
+                          •
+                        </span>
+                        <span className="flex-1">{children}</span>
+                      </li>
+                    ),
+                    strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                    em: ({children}) => <em className="italic text-gray-700">{children}</em>,
+                    blockquote: ({children}) => <blockquote className="border-l-4 border-purple-400 pl-4 italic text-gray-600 my-4 bg-white/50 py-2 rounded-r">{children}</blockquote>,
+                    code: ({children}) => <code className="bg-purple-100 px-2 py-1 rounded text-sm font-mono text-purple-800">{children}</code>,
+                    pre: ({children}) => <pre className="bg-gray-200 p-4 rounded-lg overflow-x-auto text-sm font-mono text-gray-800 my-4">{children}</pre>,
+                    table: ({children}) => <table className="w-full border-collapse border border-gray-300 my-4">{children}</table>,
+                    th: ({children}) => <th className="border border-gray-300 px-3 py-2 text-left bg-gray-100 font-semibold text-gray-800">{children}</th>,
+                    td: ({children}) => <td className="border border-gray-300 px-3 py-2 text-gray-700">{children}</td>,
+                    a: ({children, href}) => <a href={href} className="text-purple-600 hover:text-purple-800 underline" target="_blank" rel="noopener noreferrer">{children}</a>
+                  }}
+                >
+                  {result.summary}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         ) : result.transcription && (

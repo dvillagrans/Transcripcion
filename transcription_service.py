@@ -1077,18 +1077,20 @@ class TranscriptionService:
         try:
             logger.info(f"🧠 Generando resumen de texto corto con {CONFIG['ollama_model']}...")
             
-            prompt = f"""Eres un experto en resumir contenido. Analiza el siguiente texto transcrito de audio y haz un resumen breve y claro en español.
+            prompt = f"""Eres un experto en resumir contenido. Analiza el siguiente texto transcrito de audio y crea un resumen mejorado en español.
 
 INSTRUCCIONES:
-- Si el texto es muy corto, parafrasea y mejora la información disponible
+- Aunque el texto sea corto, proporciona un análisis detallado
+- Extrae y amplía todos los puntos mencionados
 - Mantén un lenguaje claro y profesional  
-- Identifica los puntos clave aunque sean pocos
-- Máximo 100 palabras
+- Identifica conceptos clave y su contexto
+- Organiza la información de forma estructurada
+- Máximo 150-200 palabras
 
 TEXTO A RESUMIR:
 {text}
 
-RESUMEN:"""
+RESUMEN DETALLADO:"""
 
             response = ollama.chat(
                 model=CONFIG['ollama_model'],
@@ -1097,9 +1099,9 @@ RESUMEN:"""
                     'content': prompt
                 }],
                 options={
-                    'temperature': 0.3,
-                    'num_predict': 150,
-                    'top_p': 0.9
+                    'temperature': 0.2,
+                    'num_predict': 250,
+                    'top_p': 0.8
                 }
             )
             
@@ -1107,7 +1109,8 @@ RESUMEN:"""
             
             # Agregar estadísticas
             word_count = len(text.split())
-            summary += f"\n\n📊 Estadísticas: ~{word_count} palabras en la transcripción original."
+            summary_word_count = len(summary.split())
+            summary += f"\n\n📊 **Estadísticas:** {word_count} palabras originales → {summary_word_count} palabras de resumen"
             summary += f"\n🧠 Resumen generado con {CONFIG['ollama_model']}"
             
             logger.success("✅ Resumen de texto corto generado con LLM")
@@ -1122,19 +1125,46 @@ RESUMEN:"""
         try:
             logger.info(f"🧠 Generando resumen de texto largo con {CONFIG['ollama_model']}...")
             
-            prompt = f"""Eres un experto en resumir contenido. Resume el siguiente texto transcrito de audio en español de forma clara y concisa.
+            # Calcular longitud apropiada del resumen basada en el texto original
+            word_count = len(text.split())
+            
+            # Determinar longitud del resumen (10-15% del original, mínimo 400 palabras)
+            if word_count < 1000:
+                target_words = "200-300"
+                max_tokens = 400
+            elif word_count < 3000:
+                target_words = "400-600"
+                max_tokens = 800
+            elif word_count < 6000:
+                target_words = "600-900"
+                max_tokens = 1200
+            else:
+                target_words = "800-1200"
+                max_tokens = 1600
+            
+            prompt = f"""Eres un experto en resumir contenido académico y profesional. Analiza el siguiente texto transcrito de audio y crea un resumen detallado y estructurado en español.
 
-INSTRUCCIONES:
-- Haz un resumen estructurado en 3-5 párrafos
-- Incluye los puntos más importantes y relevantes
-- Mantén un lenguaje claro y profesional
-- No agregues información que no esté en el texto original
-- Máximo 200-300 palabras
+INSTRUCCIONES PARA EL RESUMEN:
+- Crea un resumen comprehensivo de {target_words} palabras
+- Estructura el contenido en secciones claras con subtemas
+- Incluye TODOS los conceptos importantes mencionados
+- Mantén ejemplos específicos y detalles relevantes
+- Preserva la terminología técnica y conceptos clave
+- Organiza la información de forma lógica y coherente
+- Usa viñetas o párrafos numerados para mayor claridad
+- No omitas información importante por limitaciones de espacio
 
-TEXTO A RESUMIR:
+ESTRUCTURA SUGERIDA:
+1. **Tema Principal**: Breve introducción al tema central
+2. **Conceptos Clave**: Definiciones y explicaciones importantes  
+3. **Desarrollo del Contenido**: Puntos principales desarrollados
+4. **Detalles Específicos**: Ejemplos, casos particulares o aplicaciones
+5. **Conclusiones**: Síntesis final o puntos de cierre
+
+TEXTO A RESUMIR ({word_count} palabras):
 {text}
 
-RESUMEN:"""
+RESUMEN DETALLADO:"""
 
             response = ollama.chat(
                 model=CONFIG['ollama_model'],
@@ -1143,18 +1173,26 @@ RESUMEN:"""
                     'content': prompt
                 }],
                 options={
-                    'temperature': 0.3,
-                    'num_predict': 400,
-                    'top_p': 0.9
+                    'temperature': 0.2,  # Más determinístico para mayor precisión
+                    'num_predict': max_tokens,
+                    'top_p': 0.8,
+                    'top_k': 40
                 }
             )
             
             summary = response['message']['content'].strip()
             
-            # Agregar estadísticas
-            word_count = len(text.split())
+            # Agregar estadísticas detalladas
             sentence_count = len([s for s in text.split('.') if s.strip()])
-            summary += f"\n\n📊 Estadísticas: {sentence_count} oraciones, ~{word_count} palabras en la transcripción original."
+            summary_word_count = len(summary.split())
+            compression_ratio = round((word_count / summary_word_count), 1) if summary_word_count > 0 else 0
+            
+            summary += f"\n\n📊 **Estadísticas de Transcripción:**"
+            summary += f"\n• **Oraciones originales:** {sentence_count}"
+            summary += f"\n• **Palabras originales:** {word_count:,}"
+            summary += f"\n• **Palabras del resumen:** {summary_word_count}"
+            summary += f"\n• **Ratio de compresión:** {compression_ratio}:1"
+            summary += f"\n• **Cobertura del resumen:** {round((summary_word_count/word_count)*100, 1)}%"
             summary += f"\n🧠 Resumen generado con {CONFIG['ollama_model']}"
             
             logger.success("✅ Resumen de texto largo generado con LLM")
