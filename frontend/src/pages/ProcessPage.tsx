@@ -114,24 +114,7 @@ const ProcessPage: React.FC = () => {
   const startPolling = (jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        // Obtener progreso detallado desde el servicio de transcripción
-        const transcriptionResponse = await fetch(`http://localhost:5000/progress/${jobId}`);
-        const transcriptionResult = await transcriptionResponse.json();
-        
-        let detailedProgress = {};
-        if (transcriptionResult.success) {
-          detailedProgress = {
-            estimated_time_remaining: transcriptionResult.progress.estimated_time_remaining,
-            current_segment: transcriptionResult.progress.current_segment,
-            total_segments: transcriptionResult.progress.total_segments,
-            processed_duration: transcriptionResult.progress.processed_duration,
-            total_duration: transcriptionResult.progress.total_duration,
-            use_segmentation: transcriptionResult.progress.total_segments > 1,
-            start_time: transcriptionResult.progress.start_time
-          };
-        }
-
-        // Obtener estado del backend Express
+        // Obtener estado del backend Express (que ahora incluye datos del servicio Python)
         const response = await fetch(`/api/audio/status/${jobId}`);
         const result = await response.json();
 
@@ -142,7 +125,13 @@ const ProcessPage: React.FC = () => {
             status: result.data.status,
             progress: result.data.progress,
             currentStage: result.data.currentStage,
-            ...detailedProgress
+            estimated_time_remaining: result.data.estimated_time_remaining,
+            current_segment: result.data.current_segment,
+            total_segments: result.data.total_segments,
+            processed_duration: result.data.processed_duration,
+            total_duration: result.data.total_duration,
+            use_segmentation: result.data.use_segmentation,
+            start_time: result.data.start_time
           };
           setCurrentJob(updatedJob);
 

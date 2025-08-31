@@ -53,6 +53,8 @@ const SegmentProgressDisplay: React.FC<SegmentProgressDisplayProps> = ({
   } = progressData;
 
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || seconds < 0) return '0s';
+    
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -67,12 +69,12 @@ const SegmentProgressDisplay: React.FC<SegmentProgressDisplayProps> = ({
   };
 
   const formatTimeRemaining = (minutes?: number) => {
-    if (!minutes) return 'Calculando...';
+    if (!minutes || isNaN(minutes) || minutes <= 0) return 'Calculando...';
     if (minutes < 1) return 'Menos de 1 minuto';
     if (minutes < 60) return `${Math.ceil(minutes)} minutos`;
     const hours = Math.floor(minutes / 60);
     const mins = Math.ceil(minutes % 60);
-    return `${hours}h ${mins}m`;
+    return `${hours}h ${mins > 0 ? mins + 'm' : ''}`;
   };
 
   const getStatusIcon = (currentStatus: string) => {

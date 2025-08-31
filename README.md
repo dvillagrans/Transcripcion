@@ -1,21 +1,32 @@
 # 🎧 Pipeline de Transcripción de Audio con IA
 
-Pipeline integral de procesamiento de audio que automatiza la transcripción de archivos largos usando tecnologías de inteligencia artificial avanzadas. **Optimizado para sistemas de 32GB RAM** con procesamiento paralelo y generación automática de resúmenes.
+Pipeline integral de procesamiento de audio que automatiza la transcripción de archivos largos usando tecnologías de inteligencia artificial avanzadas. **Optimizado para sistemas de 32GB RAM** con procesamiento paralelo y generación automática de resúmenes inteligentes con Markdown.
 
 ## ✨ Características Principales
 
 ### 🚀 Transcripción Avanzada Optimizada
 - **Modelos Whisper Optimizados**: Soporte completo para todos los modelos (tiny → large-v3)
 - **Segmentación Inteligente**: Procesa automáticamente audios largos en segmentos de 10 minutos
-- **Procesamiento Paralelo**: 3 workers simultáneos para sistemas de 32GB RAM
+- **Procesamiento Secuencial/Paralelo**: Configurable según recursos del sistema
 - **Múltiples Idiomas**: Español por defecto con selector de 13+ idiomas
 - **Progreso en Tiempo Real**: Visualización detallada del progreso por segmento
+- **Estabilidad Mejorada**: Modo CPU robusto para máxima confiabilidad
 
-### 🧠 Resúmenes Automáticos con IA
-- **Generación Automática**: Resúmenes inteligentes después de cada transcripción
-- **Algoritmo Avanzado**: Selecciona las 25-30% oraciones más representativas
-- **Estructura Inteligente**: Introducción + contenido principal + conclusión
-- **Estadísticas Incluidas**: Conteo de palabras y oraciones originales
+### 🧠 Resúmenes Automáticos con IA (Ollama + Llama 3.1)
+- **Generación Opcional**: Checkbox para activar/desactivar generación de resumen
+- **IA Avanzada**: Integración con Ollama Llama 3.1:8b para resúmenes inteligentes
+- **Resúmenes Detallados**: 800-1200 palabras para transcripciones largas (vs 200-300 anterior)
+- **Estructura Inteligente**: Títulos, subtemas, listas y formato profesional
+- **Renderizado Markdown**: Visualización rica con negritas, listas y jerarquía
+- **Generación Posterior**: Botón para generar resumen si no se activó inicialmente
+- **Estadísticas Detalladas**: Ratio de compresión, cobertura y métricas avanzadas
+
+### 🎨 Interfaz Moderna con Markdown
+- **Renderizado Rico**: ReactMarkdown + remark-gfm para formato completo
+- **Tipografía Profesional**: Títulos jerárquicos, listas con viñetas personalizadas
+- **Diseño Responsive**: Optimizado para desktop y móvil
+- **Componentes Modernos**: shadcn/ui + Tailwind CSS
+- **Animaciones Suaves**: Transiciones y efectos visuales
 
 ### 🌍 Soporte Multiidioma Completo
 - **Idioma por Defecto**: Español configurado automáticamente
@@ -23,18 +34,354 @@ Pipeline integral de procesamiento de audio que automatiza la transcripción de 
 - **Auto-detección**: Opción para detectar idioma automáticamente
 - **13+ Idiomas**: Español, Inglés, Francés, Alemán, Italiano, Portugués, Ruso, Japonés, Coreano, Chino, Árabe, Hindi
 
-### ⚡ Optimizaciones para 32GB RAM
-- **Modelo Large-v3**: Máxima precisión con preload en memoria
-- **Segmentos Grandes**: 10 minutos por segmento (vs 5 min estándar)
-- **Procesamiento Paralelo**: 3 workers simultáneos
-- **Gestión Inteligente**: Modelo mantenido en memoria entre transcripciones
+### ⚡ Optimizaciones de Rendimiento
+- **Modo Secuencial**: Estable y confiable para todos los sistemas
+- **Modelo Medium**: Equilibrio perfecto entre velocidad y precisión
+- **CPU Optimizado**: Configuración anti-crashes para máxima estabilidad
+- **Cache Inteligente**: Modelos precargados para procesamiento rápido
+- **Gestión de Memoria**: Prevención de overflow y crashes
 
-### 🎯 Interfaz Moderna y Responsive
-- **UI Intuitiva**: Diseño moderno con animaciones suaves
+### 🎯 Interfaz Intuitiva y Funcional
 - **Drag & Drop**: Arrastra archivos directamente
-- **Progreso Visual**: Barras de progreso y grids de segmentos detallados
-- **Información de Optimización**: Panel dedicado mostrando estado de optimizaciones
-- **Responsive**: Optimizado para desktop y móvil
+- **Vista de Progreso**: Información detallada del procesamiento
+- **Selector de Resumen**: Control opcional para generación de IA
+- **Historial Completo**: Gestión de trabajos anteriores
+- **Controles Avanzados**: Opciones para idioma y configuración
+
+## 🛠️ Stack Tecnológico
+
+### Frontend
+- **React 18** + TypeScript
+- **Tailwind CSS** + shadcn/ui components
+- **React Markdown** + remark-gfm para renderizado rico
+- **Vite** para build ultra-rápido
+- **Lucide React** para iconografía moderna
+- **React Router** para navegación SPA
+
+### Backend
+- **Express.js** + TypeScript
+- **PostgreSQL** (puerto 5433) para persistencia
+- **Redis** (puerto 6380) para caché y progreso
+- **Multer** para uploads optimizados
+- **Axios** para comunicación entre servicios
+
+### AI & Processing
+- **Faster-Whisper** para transcripción de alta calidad
+- **Ollama Llama 3.1:8b** para generación de resúmenes inteligentes
+- **NumPy** para procesamiento matemático de audio
+- **Librosa/SoundFile** para manipulación de audio avanzada
+- **Python 3.12** con virtual environment aislado
+
+### Infrastructure
+- **Docker Compose** para servicios de base de datos
+- **Scripts automatizados** para setup completo
+- **Gestión de entornos** Python automatizada
+- **Configuración robusta** anti-crashes
+
+## 📋 Requisitos del Sistema
+
+### Mínimos
+- **Node.js** 18+ y **pnpm**
+- **Python** 3.12+ con pip
+- **Docker** y **Docker Compose**
+- **Ollama** instalado con modelo llama3.1:8b
+- **4GB RAM** (funcional)
+
+### Recomendados
+- **16GB+ RAM** para procesamiento fluido
+- **SSD** para modelo caché rápido
+- **CPU moderno** (Intel i5/i7 o AMD Ryzen 5/7)
+
+## 🚀 Instalación y Configuración
+
+### 🎯 Paso 1: Clonar e Instalar
+
+```bash
+# Clonar repositorio
+git clone https://github.com/dvillagrans/Transcripcion.git
+cd Transcripcion
+
+# Instalación automatizada
+python3 setup_python.py    # Configura Python
+python3 install.py         # Instala dependencias completas
+```
+
+### 🤖 Paso 2: Configurar Ollama (Para Resúmenes IA)
+
+```bash
+# Instalar Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Descargar modelo Llama 3.1
+ollama pull llama3.1:8b
+
+# Verificar instalación
+ollama list
+```
+
+### 🎯 Paso 3: Inicio Rápido
+
+```bash
+# Opción 1: Desarrollo rápido (recomendado)
+python3 start_dev.py
+
+# Opción 2: Inicio completo con servicios
+python3 start_all.py
+```
+
+## 🌐 Acceso a la Aplicación
+
+| Servicio | URL | Puerto | Descripción |
+|----------|-----|---------|-------------|
+| **Frontend** | http://localhost:3000 | 3000 | Interfaz principal |
+| **Backend API** | http://localhost:3001 | 3001 | API REST |
+| **Python Service** | http://localhost:5000 | 5000 | Servicio de transcripción |
+| **PostgreSQL** | localhost:5433 | 5433 | Base de datos |
+| **Redis** | localhost:6380 | 6380 | Caché y progreso |
+| **Ollama** | localhost:11434 | 11434 | Servicio de IA |
+
+## 🎯 Guía de Uso Completa
+
+### 1. 🎵 Subir y Procesar Audio
+- Ve a **Procesar** (`/process`)
+- **Arrastra y suelta** archivos o selecciona desde explorador
+- **Formatos soportados**: `MP3`, `WAV`, `FLAC`, `M4A`, `OGG`
+- **Tamaño máximo**: **100MB**
+- **Selecciona idioma** si es necesario
+- **✅ Activa "Generar Resumen AI"** para obtener resumen inteligente
+- Haz clic en **"Procesar Audio"**
+
+### 2. 📊 Monitoreo en Tiempo Real
+- **Progreso visual** con porcentaje actualizado
+- **Información de segmentos** para archivos largos
+- **Tiempo estimado** de finalización
+- **Estado actual** del procesamiento
+
+### 3. 📋 Resultados con Markdown
+- 📝 **Transcripción completa** formateada
+- 🧠 **Resumen IA** (si se activó) con formato rico:
+  - **Títulos jerárquicos** (H1, H2, H3, H4)
+  - **Listas con viñetas** personalizadas
+  - **Texto en negrita** y *cursiva*
+  - **Estructura profesional** organizada
+  - **Estadísticas detalladas** de compresión
+- 💾 **Descarga** en formato texto
+- 📋 **Copia rápida** al portapapeles
+- 🔄 **Genera resumen posterior** si no se activó inicialmente
+
+### 4. 📚 Historial y Gestión
+- **Lista completa** de transcripciones anteriores
+- **Estado detallado** de cada procesamiento
+- **Descarga** de resultados anteriores
+
+## 🎨 Nuevas Características de Resúmenes
+
+### 🧠 Generación Inteligente con Ollama
+```
+Ejemplo de resumen generado:
+
+**1. Tema Principal**
+La transcripción aborda el procesamiento de lenguaje natural como rama fundamental de la IA...
+
+**2. Conceptos Clave**
+• **Tokenización**: Proceso de división del texto en unidades más pequeñas
+• **Modelos Transformer**: Arquitecturas como GPT y BERT para comprensión de lenguaje
+• **Teoría de la Información**: Marco matemático para optimización de transmisión
+
+**3. Desarrollo del Contenido**
+El contenido se estructura en tres partes principales: fundamentos teóricos, aplicaciones prácticas y consideraciones éticas...
+
+📊 **Estadísticas de Transcripción:**
+• **Oraciones originales:** 127
+• **Palabras originales:** 3,247
+• **Palabras del resumen:** 892
+• **Ratio de compresión:** 3.6:1
+• **Cobertura del resumen:** 27.5%
+🧠 Resumen generado con llama3.1:8b
+```
+
+### ✨ Renderizado Markdown Mejorado
+- **Títulos con jerarquía** visual clara
+- **Listas con viñetas** personalizadas en color
+- **Texto en negrita** y *cursiva* resaltado
+- **Espaciado inteligente** entre secciones
+- **Tipografía profesional** optimizada para lectura
+
+### 🎛️ Control de Generación
+- **Checkbox opcional** en formulario de carga
+- **Botón "Generar Resumen IA"** en página de resultados
+- **Indicador visual** del estado de generación
+- **Polling automático** hasta completar resumen
+
+## 🔧 API Reference
+
+### 🎵 Audio Processing API
+
+#### Upload con Resumen Opcional
+```bash
+POST /api/audio/upload
+Content-Type: multipart/form-data
+
+{
+  "audioFile": File,
+  "whisperModel": "medium",        # tiny|base|small|medium|large-v3
+  "language": "es",                # Código de idioma
+  "generateSummary": "true"        # "true" para activar resumen IA
+}
+```
+
+#### Generar Resumen Posterior
+```bash
+POST /api/audio/generate-summary/:jobId
+
+Response:
+{
+  "success": true,
+  "message": "Generación de resumen iniciada"
+}
+```
+
+### 🐍 Python Service API
+
+#### Generar Resumen Independiente
+```bash
+POST http://localhost:5000/generate_summary
+
+{
+  "text": "Texto completo de la transcripción..."
+}
+
+Response:
+{
+  "success": true,
+  "summary": "**Resumen Detallado**\n\n**1. Tema Principal**\n..."
+}
+```
+
+## ⚙️ Configuración
+
+### 🔧 Variables de Entorno Principales
+
+```bash
+# === ESTABILIDAD ===
+FORCE_CPU=true                  # Usar CPU para máxima estabilidad
+DEFAULT_MODEL=medium            # Modelo equilibrado
+DISABLE_PARALLEL_PROCESSING=true  # Procesamiento secuencial
+
+# === OLLAMA ===
+USE_OLLAMA=true                 # Activar resúmenes IA
+OLLAMA_MODEL=llama3.1:8b        # Modelo para resúmenes
+OLLAMA_URL=http://localhost:11434
+
+# === BASE DE DATOS ===
+DATABASE_URL=postgresql://postgres:postgres_password@localhost:5433/audio_pipeline
+REDIS_HOST=localhost
+REDIS_PORT=6380
+
+# === SERVIDOR ===
+PORT=3001
+TRANSCRIPTION_SERVICE_URL=http://localhost:5000
+MAX_FILE_SIZE=104857600         # 100MB
+```
+
+### 🎛️ Configuración de Modelos
+
+| Modelo | Tamaño | Velocidad | Precisión | Recomendado para |
+|--------|--------|-----------|-----------|------------------|
+| `medium` | 769MB | ⚡⚡ | ⭐⭐⭐⭐⭐ | **Uso general** |
+| `large-v3` | 1550MB | ⚡ | ⭐⭐⭐⭐⭐ | Máxima precisión |
+
+## 📊 Rendimiento y Estadísticas
+
+### ⏱️ Tiempos de Procesamiento (CPU Mode)
+
+| Duración Audio | Tiempo Procesamiento | Ratio | Calidad |
+|----------------|---------------------|-------|---------|
+| 10 minutos | ~4-6 minutos | 1.5x | ⭐⭐⭐⭐⭐ |
+| 30 minutos | ~12-18 minutos | 1.5x | ⭐⭐⭐⭐⭐ |
+| 1 hora | ~25-35 minutos | 1.5x | ⭐⭐⭐⭐⭐ |
+
+### 🧠 Resúmenes IA
+
+- **Calidad**: Resúmenes estructurados y coherentes
+- **Compresión**: 20-35% del texto original
+- **Tiempo**: 30-60 segundos para 1000 palabras
+- **Formato**: Markdown completo con jerarquía
+
+## 🐛 Solución de Problemas
+
+### ❌ Ollama no responde
+```bash
+# Verificar servicio
+ollama ps
+
+# Reiniciar Ollama
+sudo systemctl restart ollama
+
+# Verificar modelo
+ollama list | grep llama3.1
+```
+
+### ❌ Resumen se muestra sin formato
+- Verifica que `react-markdown` esté instalado
+- El frontend renderiza automáticamente Markdown
+- Los resúmenes incluyen sintaxis Markdown nativa
+
+### ❌ Progreso muestra NaN
+- El backend ahora sincroniza correctamente con el servicio Python
+- Valores inválidos se manejan automáticamente
+- Polling mejorado para datos en tiempo real
+
+## 🔄 Changelog Reciente
+
+### 🆕 v1.6.0 - Resúmenes IA con Markdown (Actual)
+- ✅ **Integración Ollama** Llama 3.1:8b
+- ✅ **Resúmenes opcionales** con checkbox
+- ✅ **Renderizado Markdown** rico en frontend
+- ✅ **Generación posterior** de resúmenes
+- ✅ **Estadísticas detalladas** de compresión
+- ✅ **Progreso sincronizado** sin errores NaN
+- ✅ **Prompts mejorados** para resúmenes estructurados
+
+### 📋 v1.5.0 - Estabilidad y CPU Mode
+- ✅ Modo CPU robusto anti-crashes
+- ✅ Procesamiento secuencial estable
+- ✅ Modelo medium como defecto
+- ✅ Configuración optimizada para estabilidad
+
+## 🤝 Contribuciones
+
+¡Las contribuciones son bienvenidas! Especialmente en:
+
+- 🧠 **Mejoras de prompts** para resúmenes IA
+- 🎨 **Componentes Markdown** adicionales
+- 🌍 **Soporte para más idiomas**
+- ⚡ **Optimizaciones de rendimiento**
+- 📚 **Documentación y ejemplos**
+
+## 📄 Licencia
+
+MIT License - Copyright (c) 2025 dvillagrans
+
+---
+
+<div align="center">
+
+## ⭐ ¡Si te gusta este proyecto, dale una estrella! ⭐
+
+### 🚀 Inicio Rápido
+
+```bash
+git clone https://github.com/dvillagrans/Transcripcion.git
+cd Transcripcion
+python3 install.py && python3 start_dev.py
+```
+
+**Desarrollado con ❤️ usando IA, Ollama, React y tecnologías modernas**
+
+**Con resúmenes inteligentes y renderizado Markdown profesional 🤖📝**
+
+</div>
 
 ## 🛠️ Stack Tecnológico
 

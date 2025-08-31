@@ -277,11 +277,33 @@ export class AudioProcessingService {
         });
         
         if (response.data.success && response.data.progress) {
+          const pythonProgress = response.data.progress;
+          
+          // Procesar el tiempo estimado que puede venir como string
+          let estimatedTimeMinutes = null;
+          if (pythonProgress.estimated_time_remaining) {
+            if (typeof pythonProgress.estimated_time_remaining === 'string') {
+              // Extraer número de cadenas como "8.0 minutos"
+              const match = pythonProgress.estimated_time_remaining.match(/(\d+\.?\d*)/);
+              estimatedTimeMinutes = match ? parseFloat(match[1]) : null;
+            } else if (typeof pythonProgress.estimated_time_remaining === 'number') {
+              estimatedTimeMinutes = pythonProgress.estimated_time_remaining;
+            }
+          }
+          
           const progressData: JobProgress = {
             jobId: jobId,
-            progress: response.data.progress.progress || 0,
-            currentStage: response.data.progress.current_stage || 'Procesando',
-            status: response.data.progress.status || 'processing'
+            progress: pythonProgress.progress || 0,
+            currentStage: pythonProgress.current_stage || pythonProgress.stage || 'Procesando',
+            status: pythonProgress.status === 'transcribiendo' ? 'processing' : 
+                   pythonProgress.status === 'completado' ? 'completed' : 'processing',
+            estimated_time_remaining: estimatedTimeMinutes,
+            current_segment: pythonProgress.current_segment,
+            total_segments: pythonProgress.total_segments,
+            processed_duration: pythonProgress.processed_duration,
+            total_duration: pythonProgress.total_duration,
+            use_segmentation: pythonProgress.total_segments > 1,
+            start_time: pythonProgress.start_time || Date.now() / 1000
           };
           
           // Store in memory and Redis
