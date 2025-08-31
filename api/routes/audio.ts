@@ -164,6 +164,55 @@ router.get('/results/:jobId', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/audio/generate-summary/:jobId
+ * Generate AI summary for existing transcription
+ */
+router.post('/generate-summary/:jobId', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    
+    const job = await JobService.getJobById(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Trabajo no encontrado'
+      });
+    }
+
+    if (!job.transcription) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay transcripción disponible para generar resumen'
+      });
+    }
+
+    if (job.summary) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ya existe un resumen para este trabajo'
+      });
+    }
+
+    // Start summary generation asynchronously
+    AudioProcessingService.generateSummaryForJob(jobId).catch(error => {
+      console.error('Summary generation error:', error);
+    });
+
+    res.json({
+      success: true,
+      message: 'Generación de resumen iniciada'
+    });
+
+  } catch (error) {
+    console.error('Generate summary error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar resumen'
+    });
+  }
+});
+
+/**
  * GET /api/audio/jobs
  * Get list of all jobs
  */

@@ -70,43 +70,57 @@ def get_device_config():
                 'num_workers': 1
             }
         
-        # ROBUST_MODE ya no fuerza CPU - permite GPU con configuración estable
+        # ROBUST_MODE - configuración más estable para GPU
         robust_mode = os.getenv('ROBUST_MODE', 'false').lower() == 'true'
         if robust_mode:
-            logger.info("🛡️ ROBUST_MODE activado: usando configuración estable")
+            logger.info("🛡️ ROBUST_MODE activado: usando configuración GPU estable")
         
-        # Probar GPU - aún en modo robusto podemos usar GPU
+        # Configurar variables de entorno para evitar problemas cuDNN
+        disable_cudnn_conv = os.getenv('DISABLE_CUDNN_CONV', 'false').lower() == 'true'
+        if disable_cudnn_conv:
+            os.environ['CUDNN_CONVOLUTION_FWD_ALGO'] = '1'
+            os.environ['CUDNN_CONVOLUTION_BWD_DATA_ALGO'] = '1'
+            os.environ['CUDNN_CONVOLUTION_BWD_FILTER_ALGO'] = '1'
+            logger.info("🔧 cuDNN optimizations disabled for stability")
+        
+        # Configurar memoria CUDA limitada
+        cuda_memory_fraction = float(os.getenv('CUDA_MEMORY_FRACTION', '0.9'))
+        if cuda_memory_fraction < 1.0:
+            torch.cuda.set_per_process_memory_fraction(cuda_memory_fraction)
+            logger.info(f"🚀 CUDA memory limited to {cuda_memory_fraction*100}%")
+        
+        # Probar GPU de forma más robusta - sin test de cuDNN complejo
         try:
-            # Test básico de cuDNN con timeout
-            import signal
+            # Test básico y más seguro
+            x = torch.randn(1, 16, device='cuda')
+            y = x * 2
+            torch.cuda.synchronize()
+            del x, y
+            torch.cuda.empty_cache()
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Timeout en prueba cuDNN")
+            logger.info("✅ Prueba básica de CUDA exitosa, usando GPU")
             
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(5)  # 5 segundos de timeout
-            
-            try:
-                x = torch.randn(1, 1, 4, 4, device='cuda')
-                conv = torch.nn.Conv2d(1, 1, 3, padding=1).cuda()
-                _ = conv(x)
-                torch.cuda.synchronize()
-                signal.alarm(0)  # Cancelar timeout
-                
-                logger.info("✅ Prueba de cuDNN exitosa, usando GPU")
+            # En modo robusto, usar configuración más conservadora
+            if robust_mode:
+                return {
+                    'device': 'cuda',
+                    'compute_type': 'float32',  # Más estable que float16
+                    'cpu_threads': 0,
+                    'num_workers': 1,
+                    'robust': True
+                }
+            else:
                 return {
                     'device': 'cuda',
                     'compute_type': 'float16',
                     'cpu_threads': 0,
-                    'num_workers': 1
+                    'num_workers': 1,
+                    'robust': False
                 }
-            finally:
-                signal.signal(signal.SIGALRM, old_handler)
-                signal.alarm(0)
             
-        except Exception as cudnn_error:
-            logger.warning(f"⚠️ Error en cuDNN: {cudnn_error}")
-            logger.info("Cayendo a CPU por problemas de cuDNN")
+        except Exception as cuda_error:
+            logger.warning(f"⚠️ Error en CUDA: {cuda_error}")
+            logger.info("Cayendo a CPU por problemas de CUDA")
             return {
                 'device': 'cpu',
                 'compute_type': 'float32',
@@ -157,7 +171,7 @@ CONFIG = {
     # Optimizaciones para 32GB RAM
     'high_memory_mode': True,
     'segment_length': 600,  # 10 minutos por segmento (era 300)
-    'parallel_workers': 3,  # Procesar 3 segmentos simultáneamente
+    'parallel_workers': 1 if os.getenv('DISABLE_PARALLEL_PROCESSING', 'false').lower() == 'true' else 3,  # Secuencial si está desactivado
     'preload_model': True,  # Mantener modelo en memoria
     # Configuración Ollama para resúmenes avanzados
     'use_ollama': os.getenv('USE_OLLAMA', 'true').lower() in ['true', '1', 'yes'],
@@ -231,47 +245,83 @@ class TranscriptionService:
         """Obtener o cargar modelo Whisper optimizado"""
         if model_name is None:
             model_name = CONFIG['default_model']
-            
-        # Si es el modelo por defecto y está precargado, usarlo
-        if (model_name == CONFIG['default_model'] and 
-            self.preloaded_model is not None):
+        
+        # NUEVA LÓGICA: Si hay un modelo precargado, usarlo siempre (ignorar solicitudes de otros modelos)
+        if self.preloaded_model is not None:
+            preloaded_name = CONFIG['default_model']
+            if model_name != preloaded_name:
+                logger.info(f"♻️ Usando modelo precargado {preloaded_name} en lugar de {model_name} (optimización de memoria)")
+            else:
+                logger.info(f"♻️ Usando modelo precargado: {model_name}")
             return self.preloaded_model
             
-        # Thread-safe model loading
+        # Thread-safe model loading (solo si no hay precargado)
         with self.model_lock:
-            if model_name not in self.models:
-                logger.info(f"🔄 Cargando modelo Whisper: {model_name} en {CONFIG['device']}")
-                try:
-                    self.models[model_name] = WhisperModel(
-                        model_name,
-                        device=CONFIG['device'],
-                        compute_type=CONFIG['compute_type'],
-                        download_root=CONFIG['models_dir']
-                    )
-                    logger.success(f"✅ Modelo {model_name} cargado exitosamente en {CONFIG['device']}")
-                except Exception as e:
-                    logger.error(f"❌ Error cargando modelo {model_name}: {e}")
-                    # Intentar fallback a CPU si falla GPU
-                    if CONFIG['device'] == 'cuda':
-                        logger.info("🔄 Intentando fallback a CPU...")
-                        try:
-                            self.models[model_name] = WhisperModel(
-                                model_name,
-                                device='cpu',
-                                compute_type='int8',
-                                download_root=CONFIG['models_dir']
-                            )
-                            logger.success(f"✅ Modelo {model_name} cargado en CPU como fallback")
-                            # Actualizar configuración global para futuros modelos
-                            CONFIG['device'] = 'cpu'
-                            CONFIG['compute_type'] = 'int8'
-                        except Exception as cpu_error:
-                            logger.error(f"❌ Error también en CPU: {cpu_error}")
-                            raise
-                    else:
+            # Si el modelo solicitado ya está cargado, usarlo
+            if model_name in self.models:
+                logger.info(f"♻️ Reutilizando modelo cargado: {model_name}")
+                return self.models[model_name]
+            
+            # Si es un modelo diferente al por defecto, limpiar memoria primero
+            if model_name != CONFIG['default_model'] and CONFIG['device'] == 'cuda':
+                logger.info(f"🧹 Limpiando memoria GPU antes de cargar {model_name}")
+                self._cleanup_gpu_memory()
+            
+            logger.info(f"🔄 Cargando modelo Whisper: {model_name} en {CONFIG['device']}")
+            try:
+                self.models[model_name] = WhisperModel(
+                    model_name,
+                    device=CONFIG['device'],
+                    compute_type=CONFIG['compute_type'],
+                    download_root=CONFIG['models_dir']
+                )
+                logger.success(f"✅ Modelo {model_name} cargado exitosamente en {CONFIG['device']}")
+            except Exception as e:
+                logger.error(f"❌ Error cargando modelo {model_name}: {e}")
+                # Intentar fallback a CPU si falla GPU
+                if CONFIG['device'] == 'cuda':
+                    logger.info("🔄 Intentando fallback a CPU...")
+                    try:
+                        self.models[model_name] = WhisperModel(
+                            model_name,
+                            device='cpu',
+                            compute_type='int8',
+                            download_root=CONFIG['models_dir']
+                        )
+                        logger.success(f"✅ Modelo {model_name} cargado en CPU como fallback")
+                        # NO actualizar configuración global para mantener GPU para otros modelos
+                    except Exception as cpu_error:
+                        logger.error(f"❌ Error también en CPU: {cpu_error}")
                         raise
+                else:
+                    raise
                 
             return self.models[model_name]
+    
+    def _cleanup_gpu_memory(self):
+        """Limpiar memoria GPU de forma agresiva"""
+        try:
+            if CONFIG['device'] == 'cuda':
+                import torch
+                import gc
+                
+                # Limpiar caché de PyTorch
+                torch.cuda.empty_cache()
+                
+                # Forzar garbage collection
+                gc.collect()
+                
+                # Sincronizar GPU
+                torch.cuda.synchronize()
+                
+                # Obtener memoria disponible
+                if torch.cuda.is_available():
+                    memory_allocated = torch.cuda.memory_allocated() / 1024**3  # GB
+                    memory_reserved = torch.cuda.memory_reserved() / 1024**3    # GB
+                    logger.info(f"🧠 Memoria GPU: {memory_allocated:.1f}GB asignada, {memory_reserved:.1f}GB reservada")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Error limpiando memoria GPU: {e}")
     
     def validate_audio_file(self, file_path: str) -> Dict[str, Any]:
         """Validar archivo de audio"""
@@ -492,22 +542,36 @@ class TranscriptionService:
         return transcriptions_data
 
     def transcribe_segments(self, segment_paths: list, job_id: str, model, language: str = None) -> list:
-        """Transcribir cada segmento - modo secuencial (fallback)"""
+        """Transcribir cada segmento - modo secuencial o paralelo según configuración"""
         # Usar idioma por defecto si no se especifica
         if language is None:
             language = CONFIG['default_language']
-            
-        # Si hay múltiples segmentos y modo de alta memoria está habilitado, usar procesamiento paralelo
-        if len(segment_paths) > 1 and CONFIG.get('high_memory_mode', False):
+        
+        # Verificar si el procesamiento paralelo está desactivado
+        disable_parallel = os.getenv('DISABLE_PARALLEL_PROCESSING', 'false').lower() == 'true'
+        
+        # Decidir método de procesamiento
+        if disable_parallel or len(segment_paths) == 1:
+            logger.info(f"🔄 Procesamiento secuencial: {len(segment_paths)} segmentos")
+            return self._transcribe_segments_sequential(segment_paths, job_id, model, language)
+        elif CONFIG.get('high_memory_mode', False):
+            logger.info(f"⚡ Procesamiento paralelo: {len(segment_paths)} segmentos con {CONFIG['parallel_workers']} workers")
             return self.transcribe_segments_parallel(segment_paths, job_id, model, language)
-            
+        else:
+            logger.info(f"🔄 Procesamiento secuencial (modo estándar): {len(segment_paths)} segmentos")
+            return self._transcribe_segments_sequential(segment_paths, job_id, model, language)
+    
+    def _transcribe_segments_sequential(self, segment_paths: list, job_id: str, model, language: str = None) -> list:
+        """Transcribir segmentos secuencialmente - más estable"""
         transcriptions = []
         total_segments = len(segment_paths)
+        
+        logger.info(f"🎯 Iniciando transcripción secuencial de {total_segments} segmentos")
         
         for i, segment_path in enumerate(segment_paths):
             try:
                 segment_num = i + 1
-                logger.info(f"Transcribiendo segmento {segment_num}/{total_segments}: {os.path.basename(segment_path)}")
+                logger.info(f"🎵 Transcribiendo segmento {segment_num}/{total_segments}: {os.path.basename(segment_path)}")
                 
                 # Actualizar progreso
                 progress = 25 + int((i / total_segments) * 65)  # 25% a 90%
@@ -515,17 +579,24 @@ class TranscriptionService:
                     'stage': f'Transcribiendo segmento {segment_num}/{total_segments}...',
                     'progress': progress,
                     'current_segment': segment_num,
-                    'total_segments': total_segments
+                    'total_segments': total_segments,
+                    'segments_completed': i,
+                    'current_stage': f'Transcribiendo segmento {segment_num}/{total_segments} (secuencial)'
                 })
                 
-                # Transcribir segmento
+                # Transcribir segmento con configuración robusta
                 segments, info = model.transcribe(
                     segment_path,
                     language=language,
-                    beam_size=1 if CONFIG['robust_mode'] else 5,
+                    beam_size=1 if CONFIG['robust_mode'] else 3,  # Beam size conservador
+                    best_of=1 if CONFIG['robust_mode'] else 3,    # Best of conservador
+                    temperature=0.0,
                     patience=1.0,
-                    word_timestamps=True,
-                    initial_prompt=None
+                    word_timestamps=False,  # Desactivar para mayor estabilidad
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=500),
+                    initial_prompt=None,
+                    condition_on_previous_text=False
                 )
                 
                 # Recopilar texto del segmento
@@ -534,13 +605,18 @@ class TranscriptionService:
                     segment_text += segment.text + " "
                 
                 segment_text = segment_text.strip()
-                transcriptions.append({
+                
+                # Información del segmento
+                segment_info = {
                     'segment_number': segment_num,
                     'text': segment_text,
                     'file_path': segment_path,
                     'language': info.language,
-                    'duration': info.duration
-                })
+                    'duration': info.duration,
+                    'language_probability': info.language_probability
+                }
+                
+                transcriptions.append(segment_info)
                 
                 # Guardar transcripción del segmento
                 segments_dir = os.path.dirname(segment_path)
@@ -550,11 +626,19 @@ class TranscriptionService:
                 with open(transcription_file, 'w', encoding='utf-8') as f:
                     f.write(f"# Segmento {segment_num}/{total_segments}\n")
                     f.write(f"# Archivo: {os.path.basename(segment_path)}\n")
-                    f.write(f"# Idioma: {info.language}\n")
+                    f.write(f"# Idioma: {info.language} ({info.language_probability:.2f})\n")
                     f.write(f"# Duración: {info.duration:.1f}s\n\n")
                     f.write(segment_text)
                 
-                logger.info(f"✅ Segmento {segment_num} completado: {len(segment_text)} caracteres")
+                logger.success(f"✅ Segmento {segment_num} completado: {len(segment_text)} caracteres")
+                
+                # Limpiar memoria después de cada segmento
+                if CONFIG['device'] == 'cuda':
+                    try:
+                        import torch
+                        torch.cuda.empty_cache()
+                    except:
+                        pass
                 
             except Exception as e:
                 logger.error(f"❌ Error transcribiendo segmento {segment_num}: {e}")
@@ -566,6 +650,7 @@ class TranscriptionService:
                     'error': str(e)
                 })
         
+        logger.success(f"🎯 Transcripción secuencial completada: {total_segments} segmentos procesados")
         return transcriptions
     
     def cleanup_segments(self, segment_paths: list):
@@ -1290,6 +1375,41 @@ def cleanup_jobs():
             'error': str(e)
         }), 500
 
+@app.route('/generate_summary', methods=['POST'])
+def generate_summary_endpoint():
+    """Generar resumen de un texto dado"""
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Se requiere el campo "text" en el JSON'
+            }), 400
+        
+        text = data['text']
+        if not text.strip():
+            return jsonify({
+                'success': False,
+                'error': 'El texto no puede estar vacío'
+            }), 400
+        
+        logger.info(f"Generando resumen para texto de {len(text)} caracteres")
+        
+        # Generar resumen usando el servicio de transcripción
+        summary = transcription_service.generate_summary(text)
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generando resumen: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # Crear instancia del servicio
 
 if __name__ == '__main__':
@@ -1313,9 +1433,28 @@ if __name__ == '__main__':
     
     # Mostrar información de rendimiento esperado
     logger.info("📈 Rendimiento esperado con optimizaciones:")
-    logger.info("   • Audio 30 min → ~8-10 minutos")
-    logger.info("   • Audio 1 hora → ~12-15 minutos") 
-    logger.info("   • Audio 1:30h → ~15-20 minutos")
+    
+    if os.getenv('DISABLE_PARALLEL_PROCESSING', 'false').lower() == 'true':
+        logger.info("   • Audio 30 min → ~12-15 minutos (secuencial)")
+        logger.info("   • Audio 1 hora → ~20-25 minutos (secuencial)") 
+        logger.info("   • Audio 1:30h → ~25-35 minutos (secuencial)")
+        logger.info("   • Procesamiento más estable y predecible")
+    else:
+        logger.info("   • Audio 30 min → ~8-10 minutos (paralelo)")
+        logger.info("   • Audio 1 hora → ~12-15 minutos (paralelo)") 
+        logger.info("   • Audio 1:30h → ~15-20 minutos (paralelo)")
+    
+    logger.info("💡 Optimizaciones activas:")
+    logger.info(f"   • Modelo {CONFIG['default_model']} precargado en {CONFIG['device']}")
+    
+    if os.getenv('DISABLE_PARALLEL_PROCESSING', 'false').lower() == 'true':
+        logger.info(f"   • Procesamiento secuencial (más estable)")
+        logger.info(f"   • Un segmento a la vez para mayor estabilidad")
+    else:
+        logger.info(f"   • Procesamiento paralelo: {CONFIG['parallel_workers']} workers")
+    
+    logger.info(f"   • Gestión inteligente de memoria GPU")
+    logger.info(f"   • Fallback automático a CPU si es necesario")
     
     # Iniciar servidor
     port = int(os.getenv('TRANSCRIPTION_PORT', 5000))

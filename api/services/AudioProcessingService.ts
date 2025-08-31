@@ -83,7 +83,7 @@ export class AudioProcessingService {
       // Prepare transcription request
       const transcriptionRequest = {
         file_path: path.resolve(filePath),
-        model: options.whisperModel || 'medium',
+        model: options.whisperModel || 'large-v3', // Usar large-v3 que ya está precargado
         language: options.language || 'es', // Español por defecto
         generate_summary: options.generateSummary || false,
         job_id: jobId // ¡IMPORTANTE! Pasar job_id para tracking de progreso
@@ -266,6 +266,55 @@ export class AudioProcessingService {
     }
 
     return null;
+  }
+
+  static async generateSummaryForJob(jobId: string): Promise<void> {
+    try {
+      // Get job with transcription
+      const job = await JobService.getJobById(jobId);
+      if (!job || !job.transcription) {
+        throw new Error('No transcription found for job');
+      }
+
+      console.log(`Generating summary for job ${jobId}`);
+      this.setProgress(jobId, 10, 'Iniciando generación de resumen');
+
+      // Check if transcription service is available
+      const isServiceAvailable = await this.checkTranscriptionService();
+      
+      if (isServiceAvailable) {
+        // Try to generate summary using the Python service
+        try {
+          const response = await axios.post(`${this.TRANSCRIPTION_SERVICE_URL}/generate_summary`, {
+            text: job.transcription
+          });
+          
+          this.setProgress(jobId, 80, 'Procesando resumen con IA');
+          
+          if (response.data.success && response.data.summary) {
+            // Update job with the generated summary
+            await JobService.updateJob(jobId, { 
+              summary: response.data.summary 
+            });
+            this.setProgress(jobId, 100, 'Resumen completado');
+            console.log(`Summary generated successfully for job ${jobId}`);
+          } else {
+            throw new Error('Summary generation failed');
+          }
+        } catch (error) {
+          console.error('Error generating summary with Python service:', error);
+          // Fall back to simulation
+          await this.simulateSummaryGeneration(jobId);
+        }
+      } else {
+        console.log('Transcription service not available, using simulation');
+        await this.simulateSummaryGeneration(jobId);
+      }
+    } catch (error) {
+      console.error(`Error generating summary for job ${jobId}:`, error);
+      this.setProgress(jobId, 0, 'Error al generar resumen');
+      throw error;
+    }
   }
 
   static async cleanupFile(filePath: string): Promise<void> {

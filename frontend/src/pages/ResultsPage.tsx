@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FileText, Download, ArrowLeft, Copy, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Download, ArrowLeft, Copy, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface JobResult {
   jobId: string;
@@ -17,6 +17,7 @@ const ResultsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'transcription' | 'summary' | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -69,6 +70,52 @@ const ResultsPage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const generateSummary = async () => {
+    if (!jobId || !result) return;
+    
+    setGeneratingSummary(true);
+    try {
+      const response = await fetch(`/api/audio/generate-summary/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Poll for the updated result every 2 seconds
+        const pollInterval = setInterval(async () => {
+          try {
+            const resultResponse = await fetch(`/api/audio/results/${jobId}`);
+            const resultData = await resultResponse.json();
+            
+            if (resultData.success && resultData.data.summary) {
+              setResult(resultData.data);
+              clearInterval(pollInterval);
+              setGeneratingSummary(false);
+            }
+          } catch (err) {
+            console.error('Error polling for summary:', err);
+          }
+        }, 2000);
+
+        // Stop polling after 60 seconds max
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          setGeneratingSummary(false);
+        }, 60000);
+      } else {
+        setError(data.error || 'Error al generar resumen');
+        setGeneratingSummary(false);
+      }
+    } catch (err) {
+      setError('Error al conectar con el servidor');
+      setGeneratingSummary(false);
+    }
   };
 
   if (loading) {
@@ -215,7 +262,7 @@ const ResultsPage: React.FC = () => {
         )}
 
         {/* Summary */}
-        {result.summary && (
+        {result.summary ? (
           <div className="glass-effect rounded-3xl p-8 animate-slide-up">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
@@ -267,6 +314,60 @@ const ResultsPage: React.FC = () => {
               <p className="text-gray-800 whitespace-pre-wrap leading-relaxed text-lg">
                 {result.summary}
               </p>
+            </div>
+          </div>
+        ) : result.transcription && (
+          <div className="glass-effect rounded-3xl p-8 animate-slide-up">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                  <span className="text-white text-xl">🤖</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">✨ Generar Resumen IA</h2>
+                  <p className="text-gray-600">Obtén un resumen inteligente de tu transcripción</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border border-purple-200 text-center">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <span className="text-white text-2xl">🧠</span>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">¿Quieres un resumen automático?</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  Nuestra IA puede analizar tu transcripción y generar un resumen con los puntos más importantes.
+                </p>
+              </div>
+              <button
+                onClick={generateSummary}
+                disabled={generatingSummary}
+                className="group relative px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden"
+              >
+                {/* Animated background */}
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                
+                {/* Button content */}
+                <div className="relative flex items-center space-x-3">
+                  {generatingSummary ? (
+                    <>
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span>Generando Resumen...</span>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">✨</span>
+                      <span>Generar Resumen con IA</span>
+                    </>
+                  )}
+                </div>
+                
+                {/* Shine effect */}
+                <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shine"></div>
+              </button>
             </div>
           </div>
         )}

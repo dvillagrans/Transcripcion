@@ -31,6 +31,7 @@ const ProcessPage: React.FC = () => {
   const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('es');
+  const [generateSummary, setGenerateSummary] = useState(false);
   const navigate = useNavigate();
 
   // Cargar configuración guardada al montar el componente
@@ -81,7 +82,7 @@ const ProcessPage: React.FC = () => {
       const config = JSON.parse(localStorage.getItem('audioProcessingConfig') || '{}');
       formData.append('whisperModel', config.whisperModel || 'medium');
       formData.append('language', selectedLanguage || config.language || 'es');
-      formData.append('generateSummary', config.generateSummary || false);
+      formData.append('generateSummary', String(generateSummary));
 
       const response = await fetch('/api/audio/upload', {
         method: 'POST',
@@ -303,6 +304,58 @@ const ProcessPage: React.FC = () => {
                       className="space-y-3"
                     />
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Summary Option */}
+            {selectedFile && !currentJob && (
+              <Card className="mt-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 animate-slide-up">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between max-w-sm mx-auto">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <span className="text-white text-sm">🤖</span>
+                      </div>
+                      <div>
+                        <label htmlFor="generateSummary" className="text-lg font-semibold text-gray-800 cursor-pointer">
+                          Generar Resumen AI
+                        </label>
+                        <p className="text-sm text-gray-600">Crear un resumen inteligente del contenido</p>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        id="generateSummary"
+                        type="checkbox"
+                        checked={generateSummary}
+                        onChange={(e) => setGenerateSummary(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <label 
+                        htmlFor="generateSummary" 
+                        className={`block w-12 h-6 rounded-full cursor-pointer transition-all duration-300 ${
+                          generateSummary 
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg' 
+                            : 'bg-gray-300 hover:bg-gray-400'
+                        }`}
+                      >
+                        <div 
+                          className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-0.5 ${
+                            generateSummary ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  {generateSummary && (
+                    <div className="mt-4 p-3 bg-white rounded-xl border border-purple-200 animate-fade-in">
+                      <p className="text-sm text-purple-700 flex items-center space-x-2">
+                        <span className="text-purple-500">✨</span>
+                        <span>Se generará un resumen inteligente usando IA que destacará los puntos clave del contenido.</span>
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
